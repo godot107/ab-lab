@@ -39,7 +39,79 @@ stopped instance still bills its EBS volume, and it's easy to forget.
 
 Changing `infra/ec2.yaml` itself (not the app) can make CloudFormation replace
 the instance, which starts a fresh `events.db` and a fresh `AB_SALT`. Run
-`down.sh` first if the data matters.
+`down.sh` first if the data matters. **Changing `AB_DOMAIN` between runs
+counts**: the domain is baked into the instance's UserData, so it forces a
+replacement too, and with it a new public IP. See design considerations below.
+
+### Pointing a domain at it (Spaceship DNS)
+
+Decide on the domain **before the first `up.sh`**, not after:
+
+1. `AB_DOMAIN=ab.example.com ADMIN_EMAIL=admin@example.com deploy/up.sh`.
+   It prints `PublicIp` and the A record to create.
+2. In Spaceship: Domains → your domain → DNS records → add an **A** record,
+   host `ab`, value the printed IP, lowest TTL offered.
+3. `dig +short ab.example.com` until it returns that IP. Caddy keeps retrying
+   the certificate in the meantime, and the site comes up on
+   `https://ab.example.com` once DNS resolves.
+4. After the demo: `deploy/down.sh`, **then delete the A record.** The IP goes
+   back to AWS's pool; a record left behind points your name at whoever gets
+   it next.
+
+To check the instance works before DNS resolves, run
+`curl -sI -H "Host: ab.example.com" http://<PublicIp>`. A `308` redirect to
+HTTPS means Caddy is serving that host.
+
+Without a domain (`deploy/up.sh` alone), the site is plain HTTP on the public
+IP, which is enough for a screen-shared demo.
+
+## Design considerations: deliberately not built
+
+Two changes would make the "confirm by IP first, add the domain later" flow
+work. For a days-long demo, the auto-assigned IP and choosing the domain up
+front are simpler, so both are recorded here rather than implemented.
+
+### 1. Elastic IP instead of the auto-assigned public IP
+
+**Problem.** The auto-assigned IPv4 belongs to the instance. It changes
+whenever the instance is replaced (any UserData or launch-template change,
+including the domain) or stopped and started. A DNS record pointing at the old
+address silently stops working.
+
+**Change.** Add an `AWS::EC2::EIP` associated with the instance, and output it
+as `PublicIp`. The address then survives replacement and stop/start, so the DNS
+record is set once for the stack's whole life.
+
+**Cost.** None extra while it's attached: since February 2024 AWS bills every
+public IPv4 at $0.005/hr, auto-assigned or elastic. An EIP bills while idle
+too, so it has to be deleted with the stack, which `down.sh` would already do.
+
+**Why not now.** The demo stack is created once and deleted after, so its
+auto-assigned IP is stable for its whole life, as long as nothing in the
+template changes mid-demo.
+
+### 2. Apply the domain at deploy time, not at instance creation
+
+**Problem.** `AB_DOMAIN`, `ADMIN_EMAIL` and `COOKIE_SECURE` are written into
+`.env` by UserData on first boot. Changing the domain changes UserData, which
+replaces the instance: new IP, new `AB_SALT` (every returning visitor
+re-bucketed) and an empty `events.db`.
+
+**Change.** Remove the domain from UserData. `up.sh` passes it to
+`ab-deploy.sh` through the SSM command, which rewrites those three lines of
+`.env` on every deploy and leaves `AB_SALT` alone. `DomainName` stays a stack
+parameter only for the `SiteUrl` and `DnsRecord` outputs, and outputs never
+trigger replacement. Adding or changing the domain becomes a redeploy: same
+instance, same IP, same salt, same data, with Caddy picking up the new site
+address on restart.
+
+**Why not now.** The demo picks its domain before the first `up.sh`, so it
+never changes on a live stack.
+
+**Together** they allow: deploy on the bare IP, confirm the dashboard, create
+the DNS record, redeploy with the domain, and have HTTPS with no replacement
+and no data loss. A long-running deployment, like the full 28-day run, should
+have both.
 
 ## Getting at `events.db`
 

@@ -94,5 +94,8 @@ demo and **deleted** (not stopped) after, via `deploy/down.sh`, which exports
 `events.db` first. Records under `exp001_demo`, never `exp001_layout`.
 Single instance on purpose: SQLite on local disk can't sit behind a load
 balancer without splitting a visitor's events across databases. RDS/ALB/ASG
-are the documented scale-out path, deliberately not built. Reasoning,
+are the documented scale-out path, deliberately not built. So are an Elastic
+IP and deploy-time domain config: the demo uses the auto-assigned IP and picks
+`AB_DOMAIN` before the first `up.sh`, because changing it later replaces the
+instance (new IP, salt and data). Reasoning,
 costs and how to reach `events.db` in `docs/hosting.md`.

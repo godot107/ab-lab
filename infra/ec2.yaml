@@ -21,7 +21,9 @@ Parameters:
       Optional hostname, e.g. ab.example.com. Point its A record at the
       PublicIp output after the stack is up; Caddy retries until DNS resolves,
       then issues the certificate. Leave empty to serve plain HTTP on the
-      instance's public IP.
+      instance's public IP. Choose it before the first deploy: changing it
+      later replaces the instance (new IP, salt and events.db). See "Design
+      considerations" in docs/hosting.md.
     AllowedPattern: "^$|^[a-z0-9.-]+\\.[a-z]{2,}$"
 
   AdminEmail:
@@ -271,8 +273,9 @@ Outputs:
 
   PublicIp:
     Description: >-
-      Auto-assigned public IPv4. No Elastic IP: the stack lives for one demo,
-      so the address is stable for its lifetime and needs no extra resource.
+      Auto-assigned public IPv4. Stable for the instance's life, but a
+      replacement or stop/start changes it. An Elastic IP is the documented
+      alternative (docs/hosting.md, design considerations).
     Value: !GetAtt Instance.PublicIp
 
   ArtifactBucket:
