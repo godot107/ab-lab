@@ -1,5 +1,9 @@
 # AB-Lab
 
+> **Draft — work in progress.** Built and tested locally; the EC2 deployment
+> has not been run yet, and no real-traffic results exist. Nothing here reports
+> an experiment outcome.
+
 An A/B test, run end to end, on a US job-postings dashboard built from
 [Indeed Hiring Lab](https://github.com/hiring-lab/job_postings_tracker)'s
 public Job Postings Index (CC BY 4.0): one URL, two

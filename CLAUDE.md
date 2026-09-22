@@ -4,7 +4,8 @@ An end-to-end A/B test on a US job-postings dashboard (Indeed Hiring Lab data). 
 layouts, assignment is sticky and deterministic, telemetry is first-party, and
 the analysis is pre-registered.
 
-Built to evidence experimentation skill for BI/analytics roles. The deliverable is the **readout**, not the
+Built to evidence experimentation skill for BI/analytics roles. **Status:
+draft / work in progress.** The deliverable is the **readout**, not the
 running site.
 
 ## Build / run
