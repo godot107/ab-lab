@@ -47,13 +47,15 @@ Full pre-registration: [`docs/experiment_design.md`](docs/experiment_design.md).
 python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r analysis/requirements.txt
 cd app && source ../.venv/bin/activate
 AB_DB_PATH=/tmp/ab.db COOKIE_SECURE=0 python app.py    # http://localhost:5000
-python -m pytest -q                                     # 22 tests
+python -m pytest -q                                     # 27 tests
+cd .. && python -m pytest -q analysis/                  # 5 brief tests
 ```
 
 Analysis, once the stopping rule is met:
 
 ```bash
 python analysis/report.py --db data/events.db     # SRM first, then the metric
+python analysis/brief.py --db data/events.db      # plain-language brief for stakeholders
 python analysis/simulate.py                       # method vs. known ground truth
 ```
 
@@ -109,6 +111,20 @@ That harness has already earned its place: it caught a missing factor of 2 in
 the sample-size formula, which had every power calculation understating the
 required traffic by half.
 
+## Reporting to stakeholders
+
+`analysis/brief.py` writes the readout for decision-makers: the decision and
+the evidence behind it in plain language ("a gap this large would show up
+about 1 time in 116 if the layouts performed the same"), then how far to trust
+it, including what wasn't measured.
+
+While the test runs it produces only a **status update**: progress, data
+health, and usage with both layouts pooled. The A-vs-B comparison stays sealed
+until the stopping rule is met, because a scoreboard shown mid-test invites
+stopping at the first lead -- which is how a 5% false-positive rate becomes
+28%. Synthetic demo traffic is labelled as such at the top of any brief it
+appears in.
+
 ## Privacy
 
 One first-party cookie holding a random UUID — required for sticky assignment,
@@ -150,8 +166,8 @@ cloudburn scan infra --config .cloudburn.yml
 ## Layout
 
 ```
-app/          Flask app — assignment, collector, both layouts, chat endpoint, 22 tests
-analysis/     stats.py (z-test, CI, SRM, power) · report.py · simulate.py · synthetic_traffic.py
+app/          Flask app — assignment, collector, both layouts, chat endpoint, 27 tests
+analysis/     stats.py (z-test, CI, SRM, power) · report.py · brief.py · simulate.py · synthetic_traffic.py
 infra/        CloudFormation: EC2 instance, launch template, SG, IAM role, S3 bucket
 deploy/       up.sh · down.sh
 data/         build_snapshot.py — freezes the Hiring Lab + BLS JOLTS snapshot

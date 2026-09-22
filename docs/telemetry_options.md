@@ -98,8 +98,10 @@ making.
 4. **First-party only.** The beacon posts to this site's own domain. No
    third-party script, no data leaving the box.
 5. **Data minimization.** The schema holds what the experiment needs and nothing
-   speculative: visitor hash, variant, event type, timestamp, page. If a field
-   can't be tied to a metric in `experiment_design.md`, it isn't collected.
+   speculative: visitor id, variant, event type, timestamp, clicked element,
+   and a coarse device class (mobile / tablet / desktop -- never the user
+   agent). If a field can't be tied to a metric in `experiment_design.md`, it
+   isn't collected.
 6. **Honor DNT and Global Privacy Control.** Signal present -> no assignment, no
    events, control layout served. Costs a little traffic; it's the right default
    and it's a one-line check.

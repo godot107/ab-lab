@@ -96,8 +96,18 @@ the only difference. Anything else that differs is a confound;
 **So this build has no guardrail.** The decision rule below is stated
 accordingly, and the readout must say so.
 
+**Descriptive usage (context only; reported pooled while the test runs):**
+- first-click element (chart vs. each tile), from `detail_click.target`
+- returning visitors: share with more than one `pageview` (logged on every
+  load, separately from the once-per-visitor `exposure`)
+- device mix: a coarse `device` class (mobile / tablet / desktop) stored on
+  exposure and pageview rows; the user agent itself is never stored
+- chat demand: question counts per day, never the questions
+
 Everything above is derivable from the events table as it stands
-(`exposure`, `detail_click`, `interaction`, with timestamps and targets).
+(`exposure`, `pageview`, `detail_click`, `interaction`, with timestamps,
+targets and device class). Synthetic demo traffic records its device as
+`synthetic`, so it can never pass for real visitors in a readout.
 
 **Diagnostic (run before looking at any metric):**
 - Sample Ratio Mismatch. Chi-square on observed vs. expected 50/50 exposure
@@ -181,7 +191,24 @@ test, not a bare repeated z-test.
 - **Single surface, single metric** — one layout change on one dashboard. No
   claim is made about dashboards in general.
 
-## 8. Scope of the proof-of-concept deployment
+## 8. Reporting to stakeholders
+
+`analysis/brief.py` renders the result for people who act on it (a CIO, a
+product owner), in plain language: the decision first, then the evidence, then
+how far to trust it.
+
+**The A-vs-B comparison is blinded until the stopping rule is met.** While the
+test runs, the brief is a status update: progress to the planned sample, data
+health, and usage with both layouts pooled. No per-layout rates, no gap, no
+"B is ahead". An interim scoreboard shown to decision-makers is an invitation
+to stop at the first lead, which inflates a 5% false-positive rate to roughly
+28% (`analysis/simulate.py`). The final brief is produced once, from the same
+data as `report.py`, and `--final` refuses to run before the rule is met.
+
+Per-layout usage cuts appear only in the final brief, labelled exploratory:
+leads for the next experiment, never part of this decision.
+
+## 9. Scope of the proof-of-concept deployment
 
 The design above is for a full run: 28 days or 250 visitors per arm. The EC2
 proof of concept (`deploy/up.sh`) is not that run. It exists for days, not

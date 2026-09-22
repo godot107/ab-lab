@@ -111,6 +111,32 @@ def test_arms_differ_only_in_block_order(client):
     assert len(a) == 2 and a == b[::-1]
     assert a[0].startswith('<div class="block tiles"')
 
+
+def test_every_load_is_a_pageview_but_only_one_exposure(client):
+    """Returning visits are countable without inflating the denominator."""
+    import sqlite3
+    import store
+    for _ in range(3):
+        client.get("/")
+    rows = sqlite3.connect(store.DB_PATH).execute(
+        "SELECT event, COUNT(*) FROM events GROUP BY event").fetchall()
+    assert dict(rows) == {"exposure": 1, "pageview": 3}
+
+
+@pytest.mark.parametrize("ua,expected", [
+    ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148", "mobile"),
+    ("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)", "tablet"),
+    ("Mozilla/5.0 (X11; Linux x86_64) Chrome/146.0", "desktop"),
+    ("ab-lab-synthetic/1.0 (demo traffic)", "synthetic"),
+])
+def test_device_class_is_stored_not_the_user_agent(client, ua, expected):
+    import sqlite3
+    import store
+    client.get("/", headers={"User-Agent": ua})
+    rows = sqlite3.connect(store.DB_PATH).execute(
+        "SELECT DISTINCT device FROM events").fetchall()
+    assert rows == [(expected,)]
+
 # --- the collector -------------------------------------------------------
 
 def test_click_is_attributed_to_the_server_side_variant(client):

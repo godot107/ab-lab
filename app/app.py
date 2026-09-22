@@ -56,6 +56,20 @@ def is_bot() -> bool:
     return not ua or any(m in ua for m in BOT_MARKERS)
 
 
+def device_class() -> str:
+    """Coarse device class for segmenting results. Only the class is stored,
+    never the user agent. Synthetic demo traffic labels itself, so no readout
+    can mistake it for real visitors."""
+    ua = request.headers.get("User-Agent", "").lower()
+    if "ab-lab-synthetic" in ua:
+        return "synthetic"
+    if "ipad" in ua or "tablet" in ua:
+        return "tablet"
+    if "mobi" in ua or "android" in ua or "iphone" in ua:
+        return "mobile"
+    return "desktop"
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -75,7 +89,12 @@ def dashboard():
         visitor_id = str(uuid.uuid4())
 
     variant = assign(visitor_id, SALT, SPLIT)
-    store.record(now(), visitor_id, EXPERIMENT, variant, "exposure")
+    ts, device = now(), device_class()
+    # The exposure is the denominator: one per visitor, enforced by the schema.
+    # The pageview is every load, so returning visits are countable without
+    # touching that denominator.
+    store.record(ts, visitor_id, EXPERIMENT, variant, "exposure", device=device)
+    store.record(ts, visitor_id, EXPERIMENT, variant, "pageview", device=device)
 
     resp = make_response(render_template(
         "dashboard.html", variant=variant, tracking=True, experiment=EXPERIMENT,

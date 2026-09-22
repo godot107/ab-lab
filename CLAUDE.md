@@ -14,12 +14,13 @@ running site.
 python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r analysis/requirements.txt
 cd app && source ../.venv/bin/activate   # own venv: anthropic is pinned
 AB_DB_PATH=/tmp/ab.db COOKIE_SECURE=0 python app.py   # localhost:5000
-python -m pytest -q                                    # 22 tests
+python -m pytest -q                                    # 27 tests (+5 in analysis/)
 ```
 
 ```bash
 python analysis/simulate.py                    # method vs. known ground truth
 python analysis/report.py --db data/events.db  # the one-time readout
+python analysis/brief.py --db data/events.db   # stakeholder brief (blinded until the rule is met)
 ```
 
 Deploy (EC2 POC): `deploy/up.sh` / `deploy/down.sh` -- see `docs/hosting.md`.
@@ -77,6 +78,9 @@ changes):
   in a dated appendix. The pre-registration is only worth something because it
   was written first.
 - **Run `analysis/report.py` once**, when the stopping rule is met.
+- **Never show stakeholders an A-vs-B comparison mid-test.** `analysis/brief.py`
+  is blinded until the stopping rule is met (pooled usage only); don't add an
+  override. Per-layout usage cuts are exploratory, final brief only.
 - **SRM is read before any metric.** If it fails, the experiment is void — fix
   the pipeline and rerun, don't interpret.
 - Dashboard data is a frozen snapshot of Indeed Hiring Lab's public Job

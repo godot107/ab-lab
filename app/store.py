@@ -20,8 +20,10 @@ CREATE TABLE IF NOT EXISTS events (
     visitor_id  TEXT    NOT NULL,   -- random UUID, no PII, no IP
     experiment  TEXT    NOT NULL,
     variant     TEXT    NOT NULL CHECK (variant IN ('A','B')),
-    event       TEXT    NOT NULL,   -- exposure | detail_click | interaction
-    target      TEXT               -- which element, for secondary metrics
+    event       TEXT    NOT NULL,   -- exposure | pageview | detail_click | interaction
+    target      TEXT,              -- which element, for secondary metrics
+    device      TEXT               -- mobile | tablet | desktop | synthetic; exposure
+                                   -- and pageview rows only. A class, never the UA.
 );
 CREATE INDEX IF NOT EXISTS idx_events_exp ON events (experiment, variant, event);
 -- One exposure per visitor per experiment. Enforced in the schema rather than
@@ -48,16 +50,22 @@ def connect(path: Path | None = None):
 def init(path: Path | None = None) -> None:
     with connect(path) as conn:
         conn.executescript(SCHEMA)
+        # Databases created before `device` existed. Additive only: a column
+        # is added, nothing is rewritten.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(events)")}
+        if "device" not in cols:
+            conn.execute("ALTER TABLE events ADD COLUMN device TEXT")
 
 
-def record(ts, visitor_id, experiment, variant, event, target=None, path=None) -> bool:
+def record(ts, visitor_id, experiment, variant, event, target=None, device=None,
+           path=None) -> bool:
     """Insert one event. Returns False if it was a duplicate exposure."""
     with connect(path) as conn:
         try:
             conn.execute(
-                "INSERT INTO events (ts, visitor_id, experiment, variant, event, target)"
-                " VALUES (?,?,?,?,?,?)",
-                (ts, visitor_id, experiment, variant, event, target),
+                "INSERT INTO events (ts, visitor_id, experiment, variant, event, target, device)"
+                " VALUES (?,?,?,?,?,?,?)",
+                (ts, visitor_id, experiment, variant, event, target, device),
             )
             return True
         except sqlite3.IntegrityError:
