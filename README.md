@@ -125,6 +125,9 @@ stopping at the first lead -- which is how a 5% false-positive rate becomes
 28%. Synthetic demo traffic is labelled as such at the top of any brief it
 appears in.
 
+See [`docs/sample_brief.md`](docs/sample_brief.md) for both stages, generated
+from synthetic traffic with a known effect.
+
 ## Privacy
 
 One first-party cookie holding a random UUID — required for sticky assignment,
