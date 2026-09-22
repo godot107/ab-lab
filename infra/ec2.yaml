@@ -1,0 +1,298 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AB-Lab proof-of-concept on EC2: one instance running the Flask app + Caddy
+  via Docker Compose, with automatic Let's Encrypt HTTPS when a domain is given.
+
+  Built to be brought up before a demo and deleted after it (deploy/up.sh,
+  deploy/down.sh). No SSH: access is SSM Session Manager, code arrives through
+  a private S3 bucket, and the Anthropic key lives in SSM Parameter Store.
+
+  Single instance on purpose. The event store is SQLite on the instance's disk,
+  so a second instance behind a load balancer would split one visitor's
+  exposure and clicks across two databases. The scale-out path (ALB + ACM,
+  Auto Scaling group from this launch template, shared store) is in
+  docs/hosting.md.
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: ""
+    Description: >-
+      Optional hostname, e.g. ab.example.com. Point its A record at the
+      PublicIp output after the stack is up; Caddy retries until DNS resolves,
+      then issues the certificate. Leave empty to serve plain HTTP on the
+      instance's public IP.
+    AllowedPattern: "^$|^[a-z0-9.-]+\\.[a-z]{2,}$"
+
+  AdminEmail:
+    Type: String
+    Default: ""
+    Description: Let's Encrypt contact address. Only used when DomainName is set.
+
+  ExperimentName:
+    Type: String
+    Default: exp001_demo
+    Description: >-
+      Stamped on every event row. A POC deployment is a demo, not the
+      pre-registered run, so it gets its own name; its data never mixes with
+      exp001_layout.
+
+  InstanceType:
+    Type: String
+    Default: t4g.small
+    AllowedValues: [t4g.nano, t4g.micro, t4g.small, t4g.medium]
+    Description: >-
+      Graviton (arm64). t4g.small (2 GB) builds the image without swapping;
+      nano/micro work with the swapfile the bootstrap adds, just slower.
+
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+    Description: Latest Ubuntu 24.04 arm64, resolved at deploy time.
+
+Conditions:
+  HasDomain: !Not [!Equals [!Ref DomainName, ""]]
+
+Resources:
+  # Code drop and results pickup. Private, encrypted, short-lived objects.
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-artifacts
+            Status: Enabled
+            ExpirationInDays: 14
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 }
+          # No storage-class transitions (CloudBurn S3-2): nothing here lives
+          # long enough for a cheaper tier to pay for its transition fee.
+      Tags:
+        - { Key: project, Value: !Ref AWS::StackName }
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: artifacts-and-secret
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub "${ArtifactBucket.Arn}/*"
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/*"
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTP/HTTPS in; no SSH (use SSM Session Manager).
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: udp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }  # HTTP/3
+      Tags:
+        - { Key: project, Value: !Ref AWS::StackName }
+
+  # A launch template rather than inline instance settings: IMDSv2 can only be
+  # enforced here, and it is exactly what an Auto Scaling group would reuse.
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile: { Arn: !GetAtt InstanceProfile.Arn }
+        SecurityGroupIds: [!GetAtt WebSecurityGroup.GroupId]
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 2   # containers can still reach IMDS
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs: { VolumeSize: 16, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - { Key: Name, Value: !Ref AWS::StackName }
+              - { Key: project, Value: !Ref AWS::StackName }
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash
+              set -euxo pipefail
+              exec > >(tee /var/log/bootstrap.log) 2>&1
+              export DEBIAN_FRONTEND=noninteractive
+
+              apt-get update
+              apt-get install -y ca-certificates curl rsync sqlite3
+              snap wait system seed.loaded
+              snap install aws-cli --classic
+
+              # Headroom for the image build on the smaller instance types.
+              if [ ! -f /swapfile ]; then
+                fallocate -l 1G /swapfile && chmod 600 /swapfile
+                mkswap /swapfile && swapon /swapfile
+                echo '/swapfile none swap sw 0 0' >> /etc/fstab
+              fi
+
+              # Docker Engine + Compose v2 from Docker's own apt repository.
+              install -m 0755 -d /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+              chmod a+r /etc/apt/keyrings/docker.asc
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" \
+                > /etc/apt/sources.list.d/docker.list
+              apt-get update
+              apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+              systemctl enable --now docker
+
+              APP_DIR=/opt/ab-lab
+              mkdir -p "$APP_DIR"
+
+              # Experiment config, written ONCE per instance and never
+              # regenerated: changing AB_SALT after traffic starts re-buckets
+              # every returning visitor. Hence if-not-exists.
+              if [ ! -f "$APP_DIR/.env" ]; then
+                {
+                  echo "AB_DOMAIN=${SiteAddress}"
+                  echo "ADMIN_EMAIL=${Email}"
+                  echo "AB_EXPERIMENT=${ExperimentName}"
+                  echo "AB_SALT=$(openssl rand -hex 16)"
+                  echo "AB_SPLIT=50"
+                  # A Secure cookie is never sent over plain HTTP, so without
+                  # a domain every pageview would look like a new visitor.
+                  echo "COOKIE_SECURE=${CookieSecure}"
+                } > "$APP_DIR/.env"
+                chmod 600 "$APP_DIR/.env"
+              fi
+
+              # deploy/up.sh runs this through SSM after uploading a release.
+              cat > /usr/local/sbin/ab-deploy.sh <<'DEPLOY'
+              #!/bin/bash
+              set -euo pipefail
+              APP_DIR=/opt/ab-lab
+              for _ in $(seq 120); do [ -f /var/lib/bootstrap-complete ] && break; sleep 5; done
+              [ -f /var/lib/bootstrap-complete ] || { echo "bootstrap never finished"; exit 1; }
+
+              tmp=$(mktemp -d)
+              /snap/bin/aws s3 cp "s3://${ArtifactBucket}/release.tgz" "$tmp/release.tgz"
+              mkdir "$tmp/src" && tar -xzf "$tmp/release.tgz" -C "$tmp/src"
+              rsync -a --delete --exclude .env "$tmp/src/" "$APP_DIR/"
+              rm -rf "$tmp"
+
+              # Refresh the chat key from Parameter Store on every deploy; an
+              # absent parameter means chat stays off.
+              sed -i '/^ANTHROPIC_API_KEY=/d' "$APP_DIR/.env"
+              if key=$(/snap/bin/aws ssm get-parameter --name "/${AWS::StackName}/anthropic-api-key" \
+                         --with-decryption --query Parameter.Value --output text 2>/dev/null); then
+                echo "ANTHROPIC_API_KEY=$key" >> "$APP_DIR/.env"
+              fi
+
+              cd "$APP_DIR" && docker compose up -d --build
+              docker compose ps
+              DEPLOY
+
+              # deploy/down.sh runs this to collect results before teardown.
+              # sqlite3 .backup takes a consistent copy of a live database.
+              cat > /usr/local/sbin/ab-export.sh <<'EXPORT'
+              #!/bin/bash
+              set -euo pipefail
+              src=/var/lib/docker/volumes/ab-lab_events/_data/events.db
+              [ -f "$src" ] || { echo "no events.db yet"; exit 1; }
+              sqlite3 "$src" ".backup /tmp/events-export.db"
+              /snap/bin/aws s3 cp /tmp/events-export.db "s3://${ArtifactBucket}/events.db"
+              rm -f /tmp/events-export.db
+              EXPORT
+              chmod 700 /usr/local/sbin/ab-deploy.sh /usr/local/sbin/ab-export.sh
+
+              # Bring the app back after a reboot.
+              cat > /etc/systemd/system/ab-lab.service <<'UNIT'
+              [Unit]
+              Description=ab-lab (Flask + Caddy via Docker Compose)
+              Requires=docker.service
+              After=docker.service network-online.target
+              ConditionPathExists=/opt/ab-lab/compose.yaml
+
+              [Service]
+              Type=oneshot
+              RemainAfterExit=yes
+              WorkingDirectory=/opt/ab-lab
+              ExecStart=/usr/bin/docker compose up -d
+              ExecStop=/usr/bin/docker compose down
+
+              [Install]
+              WantedBy=multi-user.target
+              UNIT
+              systemctl daemon-reload
+              systemctl enable ab-lab.service
+
+              touch /var/lib/bootstrap-complete
+            - SiteAddress: !If [HasDomain, !Ref DomainName, ":80"]
+              Email: !If [HasDomain, !Ref AdminEmail, "unused@example.invalid"]
+              CookieSecure: !If [HasDomain, "1", "0"]
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+
+Outputs:
+  InstanceId:
+    Value: !Ref Instance
+
+  PublicIp:
+    Description: >-
+      Auto-assigned public IPv4. No Elastic IP: the stack lives for one demo,
+      so the address is stable for its lifetime and needs no extra resource.
+    Value: !GetAtt Instance.PublicIp
+
+  ArtifactBucket:
+    Value: !Ref ArtifactBucket
+
+  SiteUrl:
+    Value: !If
+      - HasDomain
+      - !Sub "https://${DomainName}"
+      - !Sub "http://${Instance.PublicIp}"
+
+  DnsRecord:
+    Condition: HasDomain
+    Description: Create or update this A record at your DNS provider.
+    Value: !Sub "${DomainName}  A  ${Instance.PublicIp}  (TTL 60)"
+
+  ShellCommand:
+    Description: Shell on the instance, no SSH key or open port 22 needed.
+    Value: !Sub "aws ssm start-session --target ${Instance} --region ${AWS::Region}"
+
+  TeardownReminder:
+    Description: Collect results and delete everything.
+    Value: "deploy/down.sh"

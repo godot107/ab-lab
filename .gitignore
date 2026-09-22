@@ -1,0 +1,11 @@
+.env
+*.db
+data/*.db
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.claude/settings.local.json
+# Screenshots of Indeed's portal, for reference only -- not ours to publish.
+data/reference/
+.playwright-mcp/

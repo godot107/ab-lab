@@ -1,0 +1,12 @@
+# CloudBurn static cost scan of the CloudFormation template.
+# Run locally: cloudburn scan infra --config .cloudburn.yml
+#
+# This project's cost risk is not a mis-sized resource -- it is FORGETTING TO
+# RUN deploy/down.sh after the demo (see docs/hosting.md). A static scanner
+# cannot catch that. What the scan does guard is drift: an Elastic IP, a NAT
+# gateway, an ALB or an oversized instance landing in infra/ unnoticed.
+# Known and accepted: CLDBRN-AWS-S3-2 (no storage-class transitions on a
+# bucket whose objects expire in 14 days).
+iac:
+  format: table
+  fail-on: high

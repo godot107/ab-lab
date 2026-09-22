@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>US Job Postings</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --fg: #1a1a18; --muted: #6b6b66;
+    --line: #e4e4e0; --card: #fff; --accent: #2f6f4f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16161a; --fg: #ececea; --muted: #9a9a94;
+      --line: #2c2c31; --card: #1e1e23; --accent: #6fbf95;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 0.9rem; margin: 0 0 28px; }
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; cursor: pointer; transition: border-color .15s; }
+  .tile:hover { border-color: var(--accent); }
+  .tile .label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase;
+    letter-spacing: .04em; }
+  .tile .value { font-size: 1.75rem; font-weight: 650; margin-top: 4px; letter-spacing: -0.02em; }
+  .tile .delta { font-size: 0.8rem; color: var(--accent); }
+  .chart { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px; cursor: pointer; transition: border-color .15s; }
+  .chart:hover { border-color: var(--accent); }
+  .chart h2 { font-size: 0.95rem; margin: 0 0 16px; font-weight: 600; }
+  .plot { width: 100%; height: 220px; }
+  .block { margin-bottom: 20px; }
+  .hint { color: var(--muted); font-size: 0.82rem; margin-top: 10px; }
+  #detail { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px; margin-top: 20px; }
+  #detail[hidden] { display: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.78rem;
+    text-transform: uppercase; letter-spacing: .04em; }
+  td:not(:first-child), th:not(:first-child) { text-align: right; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 0.78rem;
+    border-top: 1px solid var(--line); padding-top: 14px; }
+  footer a { color: inherit; }
+  #ask { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px; margin-top: 20px; }
+  #ask h2 { font-size: .95rem; margin: 0 0 12px; }
+  #ask form { display: flex; gap: 8px; }
+  #ask input { flex: 1; min-width: 0; font: inherit; padding: 8px 10px; color: var(--fg);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+  #ask button { font: inherit; padding: 8px 14px; border: 0; border-radius: 8px;
+    background: var(--accent); color: var(--card); cursor: pointer; }
+  #ask button:disabled { opacity: .6; cursor: default; }
+  #answer { white-space: pre-wrap; margin: 12px 0 0; }
+  #answer:empty { display: none; }
+  #ask .note { color: var(--muted); font-size: .78rem; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>US Job Postings</h1>
+  <p class="sub">Indeed Job Postings Index &middot; seasonally adjusted, Feb&nbsp;1&nbsp;2020&nbsp;=&nbsp;100
+    &middot; data as of {{ snap.as_of_label }}</p>
+
+  {# The ONLY difference between arms is the order of these two blocks.
+     Same data, same detail view, same styling -- anything else that differed
+     would be a confound. #}
+  {% if variant == 'B' %}
+    {% set order = ['chart', 'tiles'] %}
+  {% else %}
+    {% set order = ['tiles', 'chart'] %}
+  {% endif %}
+
+  {% macro arrow(v) %}{% if v > 0 %}&#9650;{% elif v < 0 %}&#9660;{% endif %}{% endmacro %}
+
+  {% for blockname in order %}
+  {% if blockname == 'tiles' %}
+  <div class="block tiles">
+    <div class="tile" data-detail="total">
+      <div class="label">All postings</div><div class="value">{{ "%.1f"|format(snap.total.index) }}</div>
+      <div class="delta">{{ arrow(snap.total.recent_change_pts) }} {{ "%.1f"|format(snap.total.recent_change_pts|abs) }} pts in {{ snap.recent_days // 7 }} wks</div>
+    </div>
+    <div class="tile" data-detail="new">
+      <div class="label">New postings</div><div class="value">{{ "%.1f"|format(snap.new.index) }}</div>
+      <div class="delta">{{ arrow(snap.new.recent_change_pts) }} {{ "%.1f"|format(snap.new.recent_change_pts|abs) }} pts in {{ snap.recent_days // 7 }} wks</div>
+    </div>
+    <div class="tile" data-detail="yoy">
+      <div class="label">Postings vs. a year ago</div><div class="value">{{ "%+.1f"|format(snap.total.yoy_pct) }}%</div>
+      <div class="delta">new postings {{ "%+.1f"|format(snap.new.yoy_pct) }}%</div>
+    </div>
+    <div class="tile" data-detail="sectors">
+      <div class="label">Sectors above Feb 2020</div><div class="value">{{ snap.sectors_above_baseline }} of {{ snap.sectors|length }}</div>
+      <div class="delta">by all postings</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="block chart" data-detail="trend">
+    <h2>Indeed job postings vs. BLS job openings, last 12 months</h2>
+    {# Fixed height so the chart library loading late can't shift the layout. #}
+    <div id="trend" class="plot" role="img"
+      aria-label="Indeed Job Postings Index over the last 12 months, weekly, ending at {{ "%.1f"|format(snap.total.index) }}"></div>
+    <p class="hint">Both series indexed to Feb 2020 = 100 (dashed line). Select to break down by occupational sector &rarr;</p>
+  </div>
+  {% endif %}
+  {% endfor %}
+
+  <section id="detail" hidden aria-live="polite">
+    <h2 style="font-size:.95rem;margin:0 0 14px;">Breakdown by occupational sector</h2>
+    <table>
+      <thead><tr><th>Sector</th><th>Index</th><th>{{ snap.recent_days // 7 }}-wk change</th><th>vs. year ago</th></tr></thead>
+      <tbody>
+        {% for s in snap.sectors %}
+        <tr><td>{{ s.name }}</td><td>{{ "%.1f"|format(s.index) }}</td>
+          <td>{{ "%+.1f"|format(s.recent_change_pts) }}</td><td>{{ "%+.1f"|format(s.yoy_pct) }}%</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {# Identical in both arms and outside the experiment: no events are logged
+     for it. It sits below the detail view so it never competes with the
+     blocks whose order is being tested for first attention. #}
+  {% if chat_enabled %}
+  <section id="ask">
+    <h2>Ask about this data</h2>
+    <form>
+      <input name="q" maxlength="300" required autocomplete="off"
+        placeholder="e.g. Which sectors are furthest below their Feb 2020 level?"
+        aria-label="Your question about this data">
+      <button type="submit">Ask</button>
+    </form>
+    <p id="answer" aria-live="polite"></p>
+    <p class="note">Answered by Claude (Anthropic) from the snapshot above only. Your
+      question is sent to Anthropic's API and not stored here. A few questions per
+      visitor per day; answers can be wrong.</p>
+  </section>
+  {% endif %}
+
+  <footer>
+    <p style="margin:0 0 10px;">Data: <a href="{{ snap.source.url }}">{{ snap.source.name }}</a>,
+      {{ snap.source.license }}. Snapshot frozen at upstream commit
+      <code>{{ snap.source.commit[:7] }}</code> for the length of the experiment.
+      Benchmark: <a href="{{ snap.jolts_source.url }}">{{ snap.jolts_source.name }}</a>,
+      re-based to Feb 2020 = 100, as published on {{ snap.built_at }}.
+      Independent portfolio project; not affiliated with or endorsed by Indeed.</p>
+    {% if tracking %}
+      This page is running an A/B test on its own layout. One first-party cookie
+      holds a random id so your layout stays consistent; no personal data, no IP,
+      no third-party scripts (the chart library is served from this site). Honors Do&nbsp;Not&nbsp;Track and Global Privacy Control.
+      <a href="https://github.com/godot107/ab-lab">Method and code</a>.
+    {% else %}
+      Measurement is off for this visit (Do&nbsp;Not&nbsp;Track / Global Privacy
+      Control respected). Nothing was logged.
+    {% endif %}
+  </footer>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/plotly-basic-4.1.1.min.js') }}"></script>
+<script>
+(function () {
+  "use strict";
+  var trend = {{ snap.trend|tojson }};
+  var jolts = {{ snap.jolts|tojson }};
+  var css = getComputedStyle(document.documentElement);
+  function v(name) { return css.getPropertyValue(name).trim(); }
+  Plotly.newPlot("trend", [{
+    x: trend.map(function (p) { return p.date; }),
+    y: trend.map(function (p) { return p.index; }),
+    type: "scatter", mode: "lines",
+    line: { color: v("--accent"), width: 2.5, shape: "spline", smoothing: 0.4 },
+    name: "Indeed postings (weekly)",
+    hovertemplate: "Indeed postings<br>%{x|%b %-d, %Y}: %{y:.1f}<extra></extra>"
+  }, {
+    // Government benchmark: monthly, lags ~2 months, openings not postings.
+    x: jolts.map(function (p) { return p.date; }),
+    y: jolts.map(function (p) { return p.index; }),
+    customdata: jolts.map(function (p) { return p.openings_k / 1000; }),
+    type: "scatter", mode: "lines+markers",
+    line: { color: v("--muted"), width: 1.5, dash: "dot" }, marker: { size: 5 },
+    name: "BLS job openings (JOLTS, monthly)",
+    hovertemplate: "BLS job openings<br>%{x|%b %Y}: %{y:.1f} (%{customdata:.2f}M)<extra></extra>"
+  }], {
+    margin: { l: 36, r: 8, t: 28, b: 28 },
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    font: { family: getComputedStyle(document.body).fontFamily, size: 11, color: v("--muted") },
+    // Hover only. Zoom and pan would be a second, unmeasured kind of
+    // interaction layered on the thing under test.
+    dragmode: false, showlegend: true,
+    legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", font: { size: 11 } },
+    xaxis: { fixedrange: true, showgrid: false, tickformat: "%b", dtick: "M2", linecolor: v("--line") },
+    yaxis: { fixedrange: true, gridcolor: v("--line"), zeroline: false, nticks: 4 },
+    shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: 100, y1: 100,
+      line: { color: v("--muted"), width: 1, dash: "dash" } }],
+    hoverlabel: { bgcolor: v("--card"), bordercolor: v("--line"), font: { color: v("--fg") } }
+  }, { displayModeBar: false, responsive: true, scrollZoom: false });
+})();
+</script>
+
+{% if chat_enabled %}
+<script>
+(function () {
+  "use strict";
+  var form = document.querySelector("#ask form");
+  var out = document.getElementById("answer");
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var btn = form.querySelector("button");
+    btn.disabled = true;
+    out.textContent = "Thinking\u2026";
+    fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: form.q.value }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { out.textContent = d.answer || d.error || "Something went wrong."; })
+      .catch(function () { out.textContent = "Couldn't reach the server."; })
+      .finally(function () { btn.disabled = false; });
+  });
+})();
+</script>
+{% endif %}
+
+{% if tracking %}
+<script>
+(function () {
+  "use strict";
+  var detail = document.getElementById("detail");
+  var fired = false;
+
+  function send(event, target) {
+    var body = JSON.stringify({ event: event, target: target });
+    // sendBeacon survives the page being closed mid-click; fetch is the
+    // fallback for browsers that lack it. The server recomputes the variant
+    // from the cookie either way -- the client never reports its own arm.
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon("/api/events", new Blob([body], { type: "application/json" }));
+    } else {
+      fetch("/api/events", { method: "POST", body: body, keepalive: true,
+        headers: { "Content-Type": "application/json" } }).catch(function () {});
+    }
+  }
+
+  document.querySelectorAll("[data-detail]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      detail.hidden = false;
+      detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      // The primary metric is "did this visitor open the detail view at all",
+      // so only the first click counts. Later clicks are secondary signal.
+      send(fired ? "interaction" : "detail_click", el.dataset.detail);
+      fired = true;
+    });
+  });
+})();
+</script>
+{% endif %}
+</body>
+</html>

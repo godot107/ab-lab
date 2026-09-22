@@ -1,0 +1,50 @@
+services:
+  web:
+    build: ./app
+    image: ab-lab-web
+    restart: unless-stopped
+    environment:
+      AB_EXPERIMENT: ${AB_EXPERIMENT:-exp001_layout}
+      AB_SALT: ${AB_SALT:?AB_SALT must be set in .env}
+      AB_SPLIT: ${AB_SPLIT:-50}
+      AB_DB_PATH: /data/events.db
+      COOKIE_SECURE: ${COOKIE_SECURE:-1}
+      # Chat box: off unless a key is set. The daily cap is the cost ceiling.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CHAT_MODEL: ${CHAT_MODEL:-claude-opus-5}
+      CHAT_MAX_TOKENS: ${CHAT_MAX_TOKENS:-400}
+      CHAT_DAILY_LIMIT: ${CHAT_DAILY_LIMIT:-100}
+      CHAT_PER_VISITOR_LIMIT: ${CHAT_PER_VISITOR_LIMIT:-5}
+    volumes:
+      - events:/data          # the experiment's only durable state
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:5000/healthz')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      AB_DOMAIN: ${AB_DOMAIN:?AB_DOMAIN must be set in .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL must be set in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  events:
+  caddy_data:
+  caddy_config:

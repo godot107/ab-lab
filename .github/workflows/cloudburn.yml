@@ -1,0 +1,22 @@
+name: cloudburn
+
+on:
+  push:
+    branches: [main]
+    paths: ["infra/**", ".cloudburn.yml", ".github/workflows/cloudburn.yml"]
+  pull_request:
+    paths: ["infra/**", ".cloudburn.yml", ".github/workflows/cloudburn.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  cost-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # Static scan only: no AWS credentials. Fails on high-severity findings.
+      - run: npx --yes cloudburn@0.18.4 scan infra --config .cloudburn.yml

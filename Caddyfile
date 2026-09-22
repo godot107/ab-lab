@@ -1,0 +1,11 @@
+# Caddy terminates TLS (automatic Let's Encrypt) and proxies to the app.
+# It does NOT split traffic -- assignment happens in the app so that every
+# bucketing decision writes an exposure event. See docs/experiment_design.md.
+{
+	email {$ADMIN_EMAIL}
+}
+
+{$AB_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:5000
+}

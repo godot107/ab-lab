@@ -1,0 +1,3 @@
+# Analysis only (report.py, simulate.py). synthetic_traffic.py is stdlib-only.
+numpy==2.5.3
+scipy==1.18.1

@@ -1,0 +1,583 @@
+{
+ "built_at": "2026-09-22",
+ "jolts": [
+  {
+   "date": "2025-09-01",
+   "index": 102.91,
+   "openings_k": 7169
+  },
+  {
+   "date": "2025-10-01",
+   "index": 102.93,
+   "openings_k": 7170
+  },
+  {
+   "date": "2025-11-01",
+   "index": 98.28,
+   "openings_k": 6846
+  },
+  {
+   "date": "2025-12-01",
+   "index": 94.03,
+   "openings_k": 6550
+  },
+  {
+   "date": "2026-01-01",
+   "index": 103.93,
+   "openings_k": 7240
+  },
+  {
+   "date": "2026-02-01",
+   "index": 99.37,
+   "openings_k": 6922
+  },
+  {
+   "date": "2026-03-01",
+   "index": 98.87,
+   "openings_k": 6887
+  },
+  {
+   "date": "2026-04-01",
+   "index": 108.89,
+   "openings_k": 7585
+  },
+  {
+   "date": "2026-05-01",
+   "index": 108.2,
+   "openings_k": 7537
+  },
+  {
+   "date": "2026-06-01",
+   "index": 103.1,
+   "openings_k": 7182
+  },
+  {
+   "date": "2026-07-01",
+   "index": 104.38,
+   "openings_k": 7271
+  }
+ ],
+ "jolts_source": {
+  "name": "BLS JOLTS, job openings, total nonfarm (SA)",
+  "url": "https://data.bls.gov/timeseries/JTS000000000000000JOL",
+  "note": "Monthly; re-based to Feb 2020 = 100. Public domain."
+ },
+ "source": {
+  "name": "Indeed Hiring Lab, Job Postings Index",
+  "url": "https://github.com/hiring-lab/job_postings_tracker",
+  "commit": "9177c58cfe6d755c955180f5d94e83de96f7ad41",
+  "license": "CC BY 4.0",
+  "note": "Seasonally adjusted, 7-day trailing average, Feb 1 2020 = 100."
+ },
+ "as_of": "2026-09-11",
+ "recent_days": 28,
+ "total": {
+  "index": 103.15,
+  "recent_change_pts": 1.37,
+  "yoy_pct": -0.2
+ },
+ "new": {
+  "index": 96.81,
+  "recent_change_pts": -0.37,
+  "yoy_pct": -13.6
+ },
+ "sectors_above_baseline": 28,
+ "sectors": [
+  {
+   "name": "Physicians & Surgeons",
+   "index": 190.03,
+   "recent_change_pts": 6.9,
+   "yoy_pct": 2.8
+  },
+  {
+   "name": "Therapy",
+   "index": 180.96,
+   "recent_change_pts": 5.93,
+   "yoy_pct": -0.4
+  },
+  {
+   "name": "Mechanical Engineering",
+   "index": 162.21,
+   "recent_change_pts": 8.22,
+   "yoy_pct": 35.5
+  },
+  {
+   "name": "Personal Care & Home Health",
+   "index": 155.76,
+   "recent_change_pts": 7.37,
+   "yoy_pct": 4.3
+  },
+  {
+   "name": "Civil Engineering",
+   "index": 155.22,
+   "recent_change_pts": 8.7,
+   "yoy_pct": 1.3
+  },
+  {
+   "name": "Electrical Engineering",
+   "index": 143.65,
+   "recent_change_pts": 5.23,
+   "yoy_pct": 21.3
+  },
+  {
+   "name": "Insurance",
+   "index": 127.83,
+   "recent_change_pts": 4.25,
+   "yoy_pct": 6.7
+  },
+  {
+   "name": "Pharmacy",
+   "index": 127.38,
+   "recent_change_pts": -5.96,
+   "yoy_pct": 2.8
+  },
+  {
+   "name": "Social Science",
+   "index": 125.91,
+   "recent_change_pts": 3.16,
+   "yoy_pct": -5.0
+  },
+  {
+   "name": "Construction",
+   "index": 124.39,
+   "recent_change_pts": 3.34,
+   "yoy_pct": 0.4
+  },
+  {
+   "name": "Production & Manufacturing",
+   "index": 123.48,
+   "recent_change_pts": 2.52,
+   "yoy_pct": 10.5
+  },
+  {
+   "name": "Logistic Support",
+   "index": 121.01,
+   "recent_change_pts": 5.9,
+   "yoy_pct": 5.6
+  },
+  {
+   "name": "Legal",
+   "index": 120.79,
+   "recent_change_pts": 0.89,
+   "yoy_pct": 0.8
+  },
+  {
+   "name": "Medical Technician",
+   "index": 120.69,
+   "recent_change_pts": 1.26,
+   "yoy_pct": -7.5
+  },
+  {
+   "name": "Industrial Engineering",
+   "index": 119.04,
+   "recent_change_pts": 5.11,
+   "yoy_pct": 32.0
+  },
+  {
+   "name": "Dental",
+   "index": 118.31,
+   "recent_change_pts": 0.69,
+   "yoy_pct": -13.2
+  },
+  {
+   "name": "Security & Public Safety",
+   "index": 117.02,
+   "recent_change_pts": 1.56,
+   "yoy_pct": 1.4
+  },
+  {
+   "name": "Aviation",
+   "index": 116.76,
+   "recent_change_pts": 1.71,
+   "yoy_pct": 8.5
+  },
+  {
+   "name": "Project Management",
+   "index": 116.66,
+   "recent_change_pts": 4.01,
+   "yoy_pct": 16.5
+  },
+  {
+   "name": "Installation & Maintenance",
+   "index": 114.35,
+   "recent_change_pts": 1.93,
+   "yoy_pct": 0.4
+  },
+  {
+   "name": "Education & Instruction",
+   "index": 108.0,
+   "recent_change_pts": -0.92,
+   "yoy_pct": -9.4
+  },
+  {
+   "name": "Loading & Stocking",
+   "index": 107.22,
+   "recent_change_pts": -1.25,
+   "yoy_pct": 8.8
+  },
+  {
+   "name": "Nursing",
+   "index": 106.45,
+   "recent_change_pts": 2.42,
+   "yoy_pct": -7.3
+  },
+  {
+   "name": "Banking & Finance",
+   "index": 105.0,
+   "recent_change_pts": 1.86,
+   "yoy_pct": 8.8
+  },
+  {
+   "name": "Community & Social Service",
+   "index": 104.74,
+   "recent_change_pts": 0.27,
+   "yoy_pct": -6.7
+  },
+  {
+   "name": "Accounting",
+   "index": 102.9,
+   "recent_change_pts": 12.38,
+   "yoy_pct": -6.3
+  },
+  {
+   "name": "Management",
+   "index": 102.46,
+   "recent_change_pts": 1.16,
+   "yoy_pct": 3.9
+  },
+  {
+   "name": "Cleaning & Sanitation",
+   "index": 101.11,
+   "recent_change_pts": 1.52,
+   "yoy_pct": 1.4
+  },
+  {
+   "name": "Administrative Assistance",
+   "index": 96.39,
+   "recent_change_pts": 1.27,
+   "yoy_pct": 0.8
+  },
+  {
+   "name": "Human Resources",
+   "index": 96.01,
+   "recent_change_pts": 1.19,
+   "yoy_pct": 12.4
+  },
+  {
+   "name": "Food Preparation & Service",
+   "index": 94.58,
+   "recent_change_pts": 0.48,
+   "yoy_pct": -7.1
+  },
+  {
+   "name": "Architecture",
+   "index": 94.32,
+   "recent_change_pts": 4.21,
+   "yoy_pct": 6.9
+  },
+  {
+   "name": "Sales",
+   "index": 92.71,
+   "recent_change_pts": 3.29,
+   "yoy_pct": 0.9
+  },
+  {
+   "name": "Retail",
+   "index": 88.53,
+   "recent_change_pts": 2.35,
+   "yoy_pct": -0.1
+  },
+  {
+   "name": "Customer Service",
+   "index": 87.99,
+   "recent_change_pts": 0.61,
+   "yoy_pct": -1.3
+  },
+  {
+   "name": "Medical Information",
+   "index": 87.87,
+   "recent_change_pts": 1.29,
+   "yoy_pct": -7.6
+  },
+  {
+   "name": "Hospitality & Tourism",
+   "index": 87.26,
+   "recent_change_pts": 1.54,
+   "yoy_pct": -1.8
+  },
+  {
+   "name": "Childcare",
+   "index": 86.27,
+   "recent_change_pts": -1.64,
+   "yoy_pct": -11.6
+  },
+  {
+   "name": "Arts & Entertainment",
+   "index": 83.56,
+   "recent_change_pts": 1.34,
+   "yoy_pct": 9.0
+  },
+  {
+   "name": "Scientific Research & Development",
+   "index": 81.79,
+   "recent_change_pts": 2.91,
+   "yoy_pct": 17.4
+  },
+  {
+   "name": "Driving",
+   "index": 81.47,
+   "recent_change_pts": -0.83,
+   "yoy_pct": -12.0
+  },
+  {
+   "name": "Software Development",
+   "index": 76.62,
+   "recent_change_pts": 2.25,
+   "yoy_pct": 17.0
+  },
+  {
+   "name": "Marketing",
+   "index": 76.4,
+   "recent_change_pts": -0.37,
+   "yoy_pct": -1.8
+  },
+  {
+   "name": "IT Systems & Solutions",
+   "index": 75.41,
+   "recent_change_pts": 2.79,
+   "yoy_pct": 7.9
+  },
+  {
+   "name": "Media & Communications",
+   "index": 70.92,
+   "recent_change_pts": -1.7,
+   "yoy_pct": 12.9
+  },
+  {
+   "name": "IT Infrastructure, Operations & Support",
+   "index": 70.37,
+   "recent_change_pts": -0.56,
+   "yoy_pct": 5.9
+  },
+  {
+   "name": "Data & Analytics",
+   "index": 61.95,
+   "recent_change_pts": 1.2,
+   "yoy_pct": 2.9
+  }
+ ],
+ "trend": [
+  {
+   "date": "2025-09-12",
+   "index": 103.35
+  },
+  {
+   "date": "2025-09-19",
+   "index": 102.58
+  },
+  {
+   "date": "2025-09-26",
+   "index": 101.75
+  },
+  {
+   "date": "2025-10-03",
+   "index": 101.32
+  },
+  {
+   "date": "2025-10-10",
+   "index": 101.22
+  },
+  {
+   "date": "2025-10-17",
+   "index": 100.96
+  },
+  {
+   "date": "2025-10-24",
+   "index": 100.54
+  },
+  {
+   "date": "2025-10-31",
+   "index": 100.58
+  },
+  {
+   "date": "2025-11-07",
+   "index": 100.71
+  },
+  {
+   "date": "2025-11-14",
+   "index": 101.0
+  },
+  {
+   "date": "2025-11-21",
+   "index": 101.72
+  },
+  {
+   "date": "2025-11-28",
+   "index": 102.4
+  },
+  {
+   "date": "2025-12-05",
+   "index": 102.06
+  },
+  {
+   "date": "2025-12-12",
+   "index": 102.15
+  },
+  {
+   "date": "2025-12-19",
+   "index": 103.32
+  },
+  {
+   "date": "2025-12-26",
+   "index": 104.08
+  },
+  {
+   "date": "2026-01-02",
+   "index": 103.03
+  },
+  {
+   "date": "2026-01-09",
+   "index": 102.37
+  },
+  {
+   "date": "2026-01-16",
+   "index": 103.12
+  },
+  {
+   "date": "2026-01-23",
+   "index": 104.08
+  },
+  {
+   "date": "2026-01-30",
+   "index": 103.8
+  },
+  {
+   "date": "2026-02-06",
+   "index": 103.64
+  },
+  {
+   "date": "2026-02-13",
+   "index": 104.54
+  },
+  {
+   "date": "2026-02-20",
+   "index": 105.27
+  },
+  {
+   "date": "2026-02-27",
+   "index": 105.45
+  },
+  {
+   "date": "2026-03-06",
+   "index": 105.3
+  },
+  {
+   "date": "2026-03-13",
+   "index": 104.43
+  },
+  {
+   "date": "2026-03-20",
+   "index": 103.18
+  },
+  {
+   "date": "2026-03-27",
+   "index": 102.28
+  },
+  {
+   "date": "2026-04-03",
+   "index": 102.24
+  },
+  {
+   "date": "2026-04-10",
+   "index": 102.96
+  },
+  {
+   "date": "2026-04-17",
+   "index": 102.74
+  },
+  {
+   "date": "2026-04-24",
+   "index": 102.92
+  },
+  {
+   "date": "2026-05-01",
+   "index": 102.5
+  },
+  {
+   "date": "2026-05-08",
+   "index": 102.41
+  },
+  {
+   "date": "2026-05-15",
+   "index": 101.6
+  },
+  {
+   "date": "2026-05-22",
+   "index": 102.1
+  },
+  {
+   "date": "2026-05-29",
+   "index": 100.83
+  },
+  {
+   "date": "2026-06-05",
+   "index": 100.19
+  },
+  {
+   "date": "2026-06-12",
+   "index": 100.44
+  },
+  {
+   "date": "2026-06-19",
+   "index": 101.14
+  },
+  {
+   "date": "2026-06-26",
+   "index": 101.39
+  },
+  {
+   "date": "2026-07-03",
+   "index": 101.09
+  },
+  {
+   "date": "2026-07-10",
+   "index": 101.17
+  },
+  {
+   "date": "2026-07-17",
+   "index": 101.54
+  },
+  {
+   "date": "2026-07-24",
+   "index": 102.09
+  },
+  {
+   "date": "2026-07-31",
+   "index": 102.1
+  },
+  {
+   "date": "2026-08-07",
+   "index": 101.69
+  },
+  {
+   "date": "2026-08-14",
+   "index": 101.78
+  },
+  {
+   "date": "2026-08-21",
+   "index": 101.9
+  },
+  {
+   "date": "2026-08-28",
+   "index": 102.13
+  },
+  {
+   "date": "2026-09-04",
+   "index": 102.41
+  },
+  {
+   "date": "2026-09-11",
+   "index": 103.15
+  }
+ ]
+}
