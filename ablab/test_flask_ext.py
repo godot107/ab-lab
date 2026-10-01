@@ -59,3 +59,16 @@ def test_bots_stay_out_of_host_experiment(host):
     _, c = host
     assert c.get("/_layout", headers={"User-Agent": "Googlebot"}).get_data(as_text=True) == "untracked"
     assert store.counts("exp_host") == {}
+
+
+def test_track_needs_an_exposed_visitor_and_a_known_event(host):
+    exp, c = host
+    with c.application.test_request_context(headers=UA):
+        assert exp.track("drill_through") is False            # no cookie: never exposed
+        with pytest.raises(ValueError):
+            exp.track("detail_click")
+    c.get("/_layout", headers=UA)
+    vid = c.get_cookie("ab_vid").value
+    with c.application.test_request_context(headers={**UA, "Cookie": f"ab_vid={vid}"}):
+        assert exp.track("drill_through", "rank") is True
+    assert store.counts("exp_host", conversion="drill_through")[assign(vid, "s1")]["converted"] == 1

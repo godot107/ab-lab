@@ -103,6 +103,18 @@ class Experiment:
         store.record(ts, vid, self.name, variant, "pageview", device=device)
         return variant
 
+    def track(self, event: str, target: str | None = None) -> bool:
+        """Log an event from server code (e.g. a Dash callback) for the current
+        visitor. Same rules as the beacon: untracked or never-exposed visitors
+        log nothing, and the arm comes from the cookie, not the caller."""
+        if event not in self.events:
+            raise ValueError(f"{event!r} is not an event this experiment collects")
+        vid = request.cookies.get(COOKIE) if self.tracked() else None
+        if not vid:
+            return False
+        return store.record(now(), vid, self.name, assign(vid, self.salt, self.split),
+                            event, (target or "")[:64] or None)
+
     def init_app(self, app: Flask) -> None:
         store.init()
         bp = Blueprint("ablab", __name__)

@@ -24,6 +24,11 @@ rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
   --exclude '__pycache__' --exclude 'var/' --exclude '*.db' \
   "$ROOT/app" "$REMOTE:/opt/$PROJECT/"
 rsync -az -e "ssh ${SSH_OPTS[*]}" "$ROOT/compose.yaml" "$REMOTE:/opt/$PROJECT/compose.yaml"
+# The experiment package from the repo root; compose finds it through ABLAB_DIR.
+rsync -az --delete -e "ssh ${SSH_OPTS[*]}" --exclude '__pycache__' --exclude 'test_*' \
+  "$ROOT/../ablab" "$REMOTE:/opt/$PROJECT/"
+ssh "${SSH_OPTS[@]}" "$REMOTE" "cd /opt/$PROJECT && touch .env && \
+  { grep -q '^ABLAB_DIR=' .env || echo 'ABLAB_DIR=./ablab' >> .env; }"
 
 say "Building and starting containers (first start downloads the data)"
 ssh "${SSH_OPTS[@]}" "$REMOTE" "sudo systemctl restart $PROJECT.service"

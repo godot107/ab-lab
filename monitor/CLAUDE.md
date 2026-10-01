@@ -6,7 +6,7 @@ Hiring Lab's public Job Postings Index, deployed to AWS EC2. See README.md for t
 ## Run / test
 
     source ../.venv/bin/activate             # ab-lab venv (shared with the experiment)
-    pip install -r requirements-dev.txt
+    pip install -r requirements-dev.txt -e ..   # -e ..: the ablab package
     python app/build_hiringlab.py --refresh  # data → app/var/ (git-ignored; DATA_DIR overrides)
     python app/hiringlab_app.py [--dev]      # http://127.0.0.1:8050
     python -m pytest                         # synthetic data, no network
@@ -24,3 +24,8 @@ Hiring Lab's public Job Postings Index, deployed to AWS EC2. See README.md for t
   value is cleared to None.
 - Deploy: `deploy/0*.sh` (EC2 via CloudFormation, Caddy HTTPS). Lint before pushing:
   `cfn-lint infra/ec2.yaml` and ShellCheck (`docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P deploy deploy/*.sh app/entrypoint.sh`).
+- **Experiments (ablab).** Off unless `AB_EXPERIMENT` is set (then `AB_SALT` is required and never
+  changes mid-test). Exposure = the `/_dash-layout` fetch; callbacks recompute the arm from the
+  cookie via `arm()`, never from client input; drill-throughs are logged server-side in `on_click`.
+  While an experiment is live, `build_hiringlab.py` refuses to refresh. The image gets `ablab` via a
+  compose `additional_contexts` (`ABLAB_DIR`, default `../ablab`).

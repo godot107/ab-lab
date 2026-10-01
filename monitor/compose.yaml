@@ -1,11 +1,22 @@
 services:
   web:
-    build: ./app
+    build:
+      context: ./app
+      # The ablab package lives at the repo root (../ablab); deploy/03 ships it to
+      # ./ablab on the host and sets ABLAB_DIR there.
+      additional_contexts:
+        ablab: ${ABLAB_DIR:-../ablab}
     image: hiring-monitor-web
     restart: unless-stopped
     environment:
       DATA_DIR: /data
       WEB_WORKERS: ${WEB_WORKERS:-1}
+      # Experiment: off unless AB_EXPERIMENT is set (then AB_SALT is required and
+      # must never change mid-experiment). See ../docs/experiment_design.md.
+      AB_EXPERIMENT: ${AB_EXPERIMENT:-}
+      AB_SALT: ${AB_SALT:-}
+      AB_SPLIT: ${AB_SPLIT:-50}
+      AB_DB_PATH: /data/events.db
     volumes:
       - hm_data:/data
     expose:

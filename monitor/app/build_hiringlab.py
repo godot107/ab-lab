@@ -73,6 +73,12 @@ def main() -> None:
     ap.add_argument("--refresh", action="store_true", help="re-download the CSVs")
     a = ap.parse_args()
 
+    # A live experiment holds the content constant across both arms and the whole
+    # window, so the daily timer becomes a no-op until AB_EXPERIMENT is unset.
+    if os.environ.get("AB_EXPERIMENT") and Path(DB).exists():
+        print(f"experiment {os.environ['AB_EXPERIMENT']} is live: data frozen, not refreshing")
+        return
+
     missing = [f for f in FILES if not (DATA / f).exists()]
     if a.refresh or missing:
         fetch()

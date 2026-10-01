@@ -24,7 +24,7 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: monitor/requirements-dev.txt
-      - run: pip install -r requirements-dev.txt
+      - run: pip install -r requirements-dev.txt -e ..   # ablab, from the repo root
       # Synthetic data only: no network, no AWS credentials.
       - run: python -m pytest -q
       - run: cfn-lint infra/ec2.yaml
@@ -39,4 +39,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: docker build -t hiring-monitor-web app
+      - run: docker build --build-context ablab=../ablab -t hiring-monitor-web app

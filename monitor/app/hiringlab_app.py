@@ -32,6 +32,7 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from flask import request
 from dash import (ALL, Dash, Input, Output, State, clientside_callback, ctx, dash_table, dcc,
                   html, no_update)
 
@@ -39,6 +40,7 @@ import dq_checks as q
 import dq_page
 import hiringlab_dashboard as hd
 import references
+from ablab import Experiment
 
 # ---------------------------------------------------------------------------
 # Data: loaded and validated once at startup
@@ -170,7 +172,7 @@ def fig_trend(m: dict, t: dict, start, end) -> go.Figure:
     return fig
 
 
-def fig_ranking(m: dict, t: dict, n: int, selected: str | None) -> go.Figure:
+def fig_ranking(m: dict, t: dict, n: int, selected: str | None, color_all: bool = False) -> go.Figure:
     sec = m["sec"]
     if 2 * n >= len(sec) - 1:                      # slider at "all": every sector, no gap row
         top, bottom = sec, sec.iloc[0:0]
@@ -180,9 +182,13 @@ def fig_ranking(m: dict, t: dict, n: int, selected: str | None) -> go.Figure:
     shown = pd.concat([top, bottom])
     order = list(top.index) + ([f"… {hidden} more sectors (see table)"] if hidden else []) + list(bottom.index)
     fig = go.Figure()
-    groups = [("Growing, beyond normal variation", shown.query("chg > 0 and beyond"), t["up"]),
-              ("Shrinking, beyond normal variation", shown.query("chg <= 0 and beyond"), t["down"]),
-              ("Within normal variation", shown.query("not beyond"), t["muted"])]
+    if color_all:   # exp001 arm B: every move colored by direction, ±3σ ticks unchanged
+        groups = [("Growing", shown.query("chg > 0"), t["up"]),
+                  ("Shrinking", shown.query("chg <= 0"), t["down"])]
+    else:
+        groups = [("Growing, beyond normal variation", shown.query("chg > 0 and beyond"), t["up"]),
+                  ("Shrinking, beyond normal variation", shown.query("chg <= 0 and beyond"), t["down"]),
+                  ("Within normal variation", shown.query("not beyond"), t["muted"])]
     for name, part, color in groups:
         if part.empty:
             continue
@@ -220,10 +226,11 @@ def fig_ranking(m: dict, t: dict, n: int, selected: str | None) -> go.Figure:
     return fig
 
 
-def fig_multiple(m: dict, t: dict, sector: str, start, end, yrange) -> go.Figure:
+def fig_multiple(m: dict, t: dict, sector: str, start, end, yrange, color_all: bool = False) -> go.Figure:
     s = m["wide"].loc[start:end, sector]
     r = m["sec"].loc[sector]
-    color = t["muted"] if not r["beyond"] else (t["up"] if r["chg"] > 0 else t["down"])
+    color = (t["muted"] if not (r["beyond"] or color_all)
+             else (t["up"] if r["chg"] > 0 else t["down"]))
     fig = go.Figure(go.Scatter(x=s.index, y=s.values, mode="lines", line=dict(color=color, width=1.75),
                                hovertemplate="%{x|%b %d, %Y}<br>Index <b>%{y:.1f}</b>"
                                              "<br><i>click to drill through</i><extra></extra>"))
@@ -329,6 +336,29 @@ def records_table(df: pd.DataFrame, highlight_dates: list[str] | None = None, ti
 # Layout
 # ---------------------------------------------------------------------------
 app = Dash(__name__, title="Hiring Demand Monitor", suppress_callback_exceptions=True)
+
+# ---------------------------------------------------------------------------
+# Experiment (ablab). Off unless AB_EXPERIMENT is set: everyone sees arm A, nothing
+# is logged. While it is on, build_hiringlab.py refuses to refresh the data: the
+# content is something both arms hold constant. Design: ../docs/experiment_design.md
+# ---------------------------------------------------------------------------
+EXP = None
+if os.environ.get("AB_EXPERIMENT"):
+    EXP = Experiment(os.environ["AB_EXPERIMENT"], salt=os.environ["AB_SALT"],
+                     split=int(os.environ.get("AB_SPLIT", "50")),
+                     events=("drill_through",), conversion="drill_through",
+                     cookie_secure=os.environ.get("COOKIE_SECURE", "1") == "1")
+    EXP.init_app(app.server)
+
+
+def arm() -> str:
+    """This request's arm, recomputed server-side from the cookie on every callback.
+    The browser never says which arm it is in."""
+    return (EXP.variant() if EXP else None) or "A"
+
+
+RANK_KEY = {"A": "Change by sector · grey = within normal variation, ticks = each sector's ±3σ limit · ",
+            "B": "Change by sector · blue = growing, red = shrinking, ticks = each sector's ±3σ limit · "}
 EXTRA_CSS = """
 .controls{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:12px 24px;align-items:start;
   background:var(--surface);box-shadow:0 0 0 1px var(--ring);border-radius:10px;padding:12px 14px;margin:14px 0 4px}
@@ -386,7 +416,7 @@ DEFAULT_WINDOW = [MONTHS.index(pd.Timestamp("2022-01-01")), len(MONTHS) - 1]
 year_marks = {i: {"label": str(mo.year)} for i, mo in enumerate(MONTHS) if mo.month == 1}
 GRAPH_CFG = {"displayModeBar": False}   # height comes from each figure's layout
 
-app.layout = html.Main([
+LAYOUT = html.Main([
     dcc.Location(id="url"),
     dcc.Store(id="theme", data="light"),
     dcc.Store(id="drill", data=None),
@@ -443,7 +473,7 @@ app.layout = html.Main([
             dcc.Graph(id="trend", config=GRAPH_CFG)]),
         html.Div(className="card", children=[
             html.H2("Which sectors are growing?"),
-            html.P(["Change by sector · grey = within normal variation, ticks = each sector's ±3σ limit · ",
+            html.P([html.Span(RANK_KEY["A"], id="rank-key"),
                     html.Span("click a bar to drill through",
                                                                  className="hint-click")], className="sub"),
             dcc.Graph(id="rank", config=GRAPH_CFG)]),
@@ -515,6 +545,17 @@ app.layout = html.Main([
         raw(references.about_html())]),
 ])
 
+
+
+def serve_layout():
+    """Dash fetches the layout once per page load (/_dash-layout): that request is the
+    exposure. Anything else that calls this (startup validation) logs nothing."""
+    if EXP and request.path.endswith("_dash-layout"):
+        EXP.expose()
+    return LAYOUT
+
+
+app.layout = serve_layout
 register_dq(app)
 
 PAGES = ["dashboard", "dq", "about"]
@@ -546,7 +587,7 @@ def reset_multiples(variable, stop, _):
     Output("trend", "figure"), Output("rank", "figure"),
     Output("multiples", "children"), Output("shared-note", "children"),
     Output("earnings-card", "style"), Output("earnings", "figure"), Output("tree", "children"),
-    Output("sector-table", "data"),
+    Output("sector-table", "data"), Output("rank-key", "children"),
     Input("series", "value"), Input("weeks", "value"), Input("window", "value"), Input("topn", "value"),
     Input("mult-sectors", "value"), Input("shared", "value"), Input("theme", "data"), Input("drill", "data"))
 def render(variable, stop, window, topn, picks, shared, theme, drill):
@@ -555,6 +596,7 @@ def render(variable, stop, window, topn, picks, shared, theme, drill):
     m = compute(variable, weeks)
     start, end = window_dates(window)
     selected = drill.get("sector") if drill else None
+    color_all = arm() == "B"
 
     picks = [p for p in (picks or []) if p in m["sec"].index]
     yrange = None
@@ -566,7 +608,7 @@ def render(variable, stop, window, topn, picks, shared, theme, drill):
         raw(f'<div class="p-title">{html_lib.escape(s)} '
             f'{delta_n(m["sec"].loc[s, "chg"], m["sec"].loc[s, "lim"])}</div>'),
         dcc.Graph(id={"type": "mult", "index": s}, config=GRAPH_CFG,
-                  figure=fig_multiple(m, t, s, start, end, yrange))]) for s in picks]
+                  figure=fig_multiple(m, t, s, start, end, yrange, color_all))]) for s in picks]
     note = ("" if yrange else "⚠ Independent y-scales: each panel stretches to fill its box, so small moves "
             "look as dramatic as big ones. Turn the shared scale back on to compare panels honestly.")
 
@@ -578,8 +620,8 @@ def render(variable, stop, window, topn, picks, shared, theme, drill):
         earn_fig, tree = go.Figure(), ""
 
     return (title(m), tiles(m, start), f"{start:%b %Y} – {end:%b %d, %Y}",
-            fig_trend(m, t, start, end), fig_ranking(m, t, topn, selected),
-            panels, note, earn_style, earn_fig, tree, table_rows(m))
+            fig_trend(m, t, start, end), fig_ranking(m, t, topn, selected, color_all),
+            panels, note, earn_style, earn_fig, tree, table_rows(m), RANK_KEY["B" if color_all else "A"])
 
 
 @app.callback(
@@ -610,6 +652,9 @@ def on_click(rank, trend, earn, mults, cell, _clear, mult_ids):
         target = {"kind": "sector", "sector": trig["index"]}
     elif trig == "sector-table" and cell:
         target = {"kind": "sector", "sector": cell["row_id"]}
+    if EXP and isinstance(target, dict):
+        # The conversion, logged server-side: a click the browser can't fabricate.
+        EXP.track("drill_through", "mult" if isinstance(trig, dict) else trig)
     return target, None, None, None, [None] * len(mult_ids), None
 
 

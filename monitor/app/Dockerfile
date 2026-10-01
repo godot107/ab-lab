@@ -9,6 +9,7 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY --from=ablab . ablab/
 COPY *.py entrypoint.sh ./
 
 # /data is a named volume: the downloaded Hiring Lab data and the data-quality history
