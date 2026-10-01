@@ -8,13 +8,18 @@ Built to evidence experimentation skill for BI/analytics roles. **Status:
 draft / work in progress.** The deliverable is the **readout**, not the
 running site.
 
+`monitor/` is the Hiring Demand Monitor (merged in from its own repo): the
+full Dash dashboard + data-quality suite on the same Hiring Lab data, with its
+own deploy and `monitor/CLAUDE.md`. It is the product experiments will run
+on; `ablab/` is the experimentation layer that mounts on its Flask server.
+
 ## Build / run
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r analysis/requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r analysis/requirements.txt -e .
 cd app && source ../.venv/bin/activate   # own venv: anthropic is pinned
 AB_DB_PATH=/tmp/ab.db COOKIE_SECURE=0 python app.py   # localhost:5000
-python -m pytest -q                                    # 27 tests (+5 in analysis/)
+python -m pytest -q                                    # 27 tests (+5 in analysis/, +5 in ablab/)
 ```
 
 ```bash
@@ -74,6 +79,9 @@ changes):
 
 ## Constraints
 
+- **The monitor's daily refresh pauses while an experiment runs on it.** The
+  frozen-content rule below applies to whatever app hosts the experiment.
+  Refreshing between experiments is fine.
 - **Do not edit `docs/experiment_design.md` once traffic starts.** Amendments go
   in a dated appendix. The pre-registration is only worth something because it
   was written first.

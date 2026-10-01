@@ -1,0 +1,38 @@
+services:
+  web:
+    build: ./app
+    image: hiring-monitor-web
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      WEB_WORKERS: ${WEB_WORKERS:-1}
+    volumes:
+      - hm_data:/data
+    expose:
+      - "8050"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8050/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s   # first start downloads ~12 MB and builds the database
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  hm_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,6 @@
+# Runtime dependencies (the Docker image installs exactly these).
+pandas>=3.0.6        # 3.0.4 segfaults on datetime filtering with numpy 2.4
+plotly>=6
+dash>=3
+pydantic>=2
+gunicorn>=23

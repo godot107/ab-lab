@@ -1,0 +1,15 @@
+# Generated data: downloaded Hiring Lab CSVs, SQLite databases, the static HTML build.
+# Rebuild with: python app/build_hiringlab.py --refresh
+app/var/
+*.db
+
+# Deploy secrets and local config (copy deploy/config.env.example)
+deploy/config.env
+.env
+Caddyfile
+
+# Python / tooling
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/

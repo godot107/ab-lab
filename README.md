@@ -15,6 +15,12 @@ the hypothesis written down before the data arrives, the sample size worked out
 in advance, the randomizer checked for mismatch before any metric is read, and
 a null result reported as a null result.
 
+The repo also holds [`monitor/`](monitor/), the **Hiring Demand Monitor**: the
+full Dash dashboard and data-quality suite on the same data. It is the product
+the experiments are meant to run on — the `ablab` package mounts on its server
+— and is documented in its own [README](monitor/README.md). Experiment 001 below
+still runs on the simpler Flask dashboard in `app/`.
+
 ## What it tests
 
 **Does leading a labor-market dashboard with a trend chart, instead of KPI
@@ -44,11 +50,11 @@ Full pre-registration: [`docs/experiment_design.md`](docs/experiment_design.md).
 ## Run it
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r analysis/requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r analysis/requirements.txt -e .
 cd app && source ../.venv/bin/activate
 AB_DB_PATH=/tmp/ab.db COOKIE_SECURE=0 python app.py    # http://localhost:5000
 python -m pytest -q                                     # 27 tests
-cd .. && python -m pytest -q analysis/                  # 5 brief tests
+cd .. && python -m pytest -q analysis/ ablab/           # 5 brief + 5 extension tests
 ```
 
 Analysis, once the stopping rule is met:
@@ -169,10 +175,12 @@ cloudburn scan infra --config .cloudburn.yml
 ## Layout
 
 ```
-app/          Flask app — assignment, collector, both layouts, chat endpoint, 27 tests
+ablab/        installable package — assignment, event store, Flask extension (collector, cookie, stats); mounts on any Flask or Dash app
+app/          Flask app — both layouts and chat endpoint on top of ablab, 27 tests
 analysis/     stats.py (z-test, CI, SRM, power) · report.py · brief.py · simulate.py · synthetic_traffic.py
 infra/        CloudFormation: EC2 instance, launch template, SG, IAM role, S3 bucket
 deploy/       up.sh · down.sh
 data/         build_snapshot.py — freezes the Hiring Lab + BLS JOLTS snapshot
 docs/         experiment_design.md · telemetry_options.md · hosting.md
+monitor/      Hiring Demand Monitor — Dash dashboard, data-quality suite, SQL, 27 tests, own deploy
 ```
