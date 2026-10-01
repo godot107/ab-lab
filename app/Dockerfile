@@ -5,12 +5,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv
 
-COPY requirements.txt .
+COPY app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py assignment.py chat.py snapshot.py snapshot.json store.py ./
-COPY templates/ templates/
-COPY static/ static/
+COPY ablab/ ablab/
+COPY app/app.py app/chat.py app/snapshot.py app/snapshot.json ./
+COPY app/templates/ templates/
+COPY app/static/ static/
 
 RUN useradd --system --uid 1001 appuser && mkdir -p /data && chown appuser /data
 USER appuser

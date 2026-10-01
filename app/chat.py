@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 
 import anthropic
 
-import store
+from ablab import store
 
 MODEL = os.environ.get("CHAT_MODEL", "claude-opus-5")
 MAX_TOKENS = int(os.environ.get("CHAT_MAX_TOKENS", "400"))

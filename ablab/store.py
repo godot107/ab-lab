@@ -11,7 +11,13 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-DB_PATH = Path(os.environ.get("AB_DB_PATH", "/data/events.db"))
+
+
+def db_path() -> Path:
+    """Read at call time, not import time, so a host app (or a test) can point
+    the store elsewhere without reloading the module."""
+    return Path(os.environ.get("AB_DB_PATH", "/data/events.db"))
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -36,7 +42,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_exposure
 
 @contextmanager
 def connect(path: Path | None = None):
-    db = Path(path or DB_PATH)
+    db = Path(path or db_path())
     db.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db)
     conn.row_factory = sqlite3.Row
@@ -72,16 +78,18 @@ def record(ts, visitor_id, experiment, variant, event, target=None, device=None,
             return False  # duplicate exposure, by design
 
 
-def counts(experiment: str, path=None) -> dict[str, dict[str, int]]:
-    """Per-arm exposed visitors and converters -- the two numbers the z-test needs."""
+def counts(experiment: str, path=None, conversion: str = "detail_click"
+           ) -> dict[str, dict[str, int]]:
+    """Per-arm exposed visitors and converters -- the two numbers the z-test needs.
+    `conversion` is the pre-registered primary event for this experiment."""
     with connect(path) as conn:
         rows = conn.execute(
             """
             SELECT variant,
                    COUNT(DISTINCT CASE WHEN event='exposure' THEN visitor_id END) AS exposed,
-                   COUNT(DISTINCT CASE WHEN event='detail_click' THEN visitor_id END) AS converted
+                   COUNT(DISTINCT CASE WHEN event=? THEN visitor_id END) AS converted
             FROM events WHERE experiment = ? GROUP BY variant
             """,
-            (experiment,),
+            (conversion, experiment),
         ).fetchall()
     return {r["variant"]: {"exposed": r["exposed"], "converted": r["converted"]} for r in rows}

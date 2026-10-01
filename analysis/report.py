@@ -13,7 +13,6 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 
 from analysis.stats import mde, srm_check, two_proportion_test  # noqa: E402
 
@@ -24,7 +23,7 @@ def main() -> int:
     ap.add_argument("--experiment", default="exp001_layout")
     args = ap.parse_args()
 
-    import store
+    from ablab import store
     counts = store.counts(args.experiment, path=Path(args.db))
     if set(counts) != {"A", "B"}:
         print(f"Need both arms, got {sorted(counts)}. No traffic yet?")

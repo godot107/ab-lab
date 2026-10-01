@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ablab"
+version = "0.1.0"
+description = "Sticky A/B assignment, first-party exposure logging, and pre-registered analysis"
+requires-python = ">=3.11"
+dependencies = ["flask>=3.0"]
+
+[tool.setuptools]
+packages = ["ablab"]

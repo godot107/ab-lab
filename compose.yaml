@@ -1,6 +1,8 @@
 services:
   web:
-    build: ./app
+    build:
+      context: .          # repo root, so the image gets the ablab package
+      dockerfile: app/Dockerfile
     image: ab-lab-web
     restart: unless-stopped
     environment:

@@ -9,3 +9,4 @@ __pycache__/
 # Screenshots of Indeed's portal, for reference only -- not ours to publish.
 data/reference/
 .playwright-mcp/
+*.egg-info/

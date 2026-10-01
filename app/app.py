@@ -9,123 +9,41 @@ diagnosable after the fact.
 from __future__ import annotations
 
 import os
-import uuid
-from datetime import datetime, timezone
 
-from flask import Flask, jsonify, make_response, render_template, request
+from flask import Flask, jsonify, render_template, request
 
 import anthropic
 
 import chat
 import snapshot
-import store
-from assignment import assign
+from ablab import Experiment
+from ablab.flask_ext import COOKIE, is_bot
 
-EXPERIMENT = os.environ.get("AB_EXPERIMENT", "exp001_layout")
-SALT = os.environ.get("AB_SALT", "exp001")
-SPLIT = int(os.environ.get("AB_SPLIT", "50"))
-COOKIE = "ab_vid"
-COOKIE_MAX_AGE = 60 * 60 * 24 * 90
-
-# Substring match on the UA, applied identically to both arms and declared in
-# the pre-registration. Crude, but a filter tuned after seeing the results is
-# not a filter, it is a knob.
-BOT_MARKERS = ("bot", "crawler", "spider", "headless", "lighthouse", "curl", "wget")
+EXP = Experiment(
+    os.environ.get("AB_EXPERIMENT", "exp001_layout"),
+    salt=os.environ.get("AB_SALT", "exp001"),
+    split=int(os.environ.get("AB_SPLIT", "50")),
+    cookie_secure=os.environ.get("COOKIE_SECURE", "1") == "1",
+)
 
 app = Flask(__name__)
 # The vendored Plotly bundle is versioned in its filename, so cache it hard.
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 30
-store.init()
+EXP.init_app(app)  # /api/events, /api/stats, the visitor cookie
 chat.init()
 # Frozen for the whole window: the content is something both arms hold constant.
 SNAP = snapshot.load()
 
 
-def opted_out() -> bool:
-    """Do Not Track / Global Privacy Control.
-
-    Honoring these costs traffic on a site that has little to spare. It is
-    still the right default: a visitor who has asked not to be measured is not
-    a visitor whose data improves this experiment.
-    """
-    return request.headers.get("DNT") == "1" or request.headers.get("Sec-GPC") == "1"
-
-
-def is_bot() -> bool:
-    ua = request.headers.get("User-Agent", "").lower()
-    return not ua or any(m in ua for m in BOT_MARKERS)
-
-
-def device_class() -> str:
-    """Coarse device class for segmenting results. Only the class is stored,
-    never the user agent. Synthetic demo traffic labels itself, so no readout
-    can mistake it for real visitors."""
-    ua = request.headers.get("User-Agent", "").lower()
-    if "ab-lab-synthetic" in ua:
-        return "synthetic"
-    if "ipad" in ua or "tablet" in ua:
-        return "tablet"
-    if "mobi" in ua or "android" in ua or "iphone" in ua:
-        return "mobile"
-    return "desktop"
-
-
-def now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
 @app.route("/")
 def dashboard():
-    # Opted out or non-human: serve the control layout, set no cookie, log
-    # nothing. These visits are outside the experiment entirely rather than
-    # being counted as a silent arm.
-    if opted_out() or is_bot():
-        return render_template("dashboard.html", variant="A", tracking=False,
-                               experiment=EXPERIMENT, snap=SNAP, chat_enabled=chat.enabled())
-
-    visitor_id = request.cookies.get(COOKIE)
-    is_new = visitor_id is None
-    if is_new:
-        visitor_id = str(uuid.uuid4())
-
-    variant = assign(visitor_id, SALT, SPLIT)
-    ts, device = now(), device_class()
-    # The exposure is the denominator: one per visitor, enforced by the schema.
-    # The pageview is every load, so returning visits are countable without
-    # touching that denominator.
-    store.record(ts, visitor_id, EXPERIMENT, variant, "exposure", device=device)
-    store.record(ts, visitor_id, EXPERIMENT, variant, "pageview", device=device)
-
-    resp = make_response(render_template(
-        "dashboard.html", variant=variant, tracking=True, experiment=EXPERIMENT,
-        snap=SNAP, chat_enabled=chat.enabled()))
-    if is_new:
-        resp.set_cookie(COOKIE, visitor_id, max_age=COOKIE_MAX_AGE, httponly=True,
-                        samesite="Lax", secure=os.environ.get("COOKIE_SECURE", "1") == "1")
-    return resp
-
-
-@app.route("/api/events", methods=["POST"])
-def collect():
-    """Beacon endpoint. The variant is NOT taken from the request body --
-    it is recomputed server-side from the visitor id, so a client cannot
-    report itself into the other arm."""
-    if opted_out() or is_bot():
-        return "", 204
-
-    visitor_id = request.cookies.get(COOKIE)
-    if not visitor_id:
-        return "", 204  # never exposed, so nothing to attribute
-
-    payload = request.get_json(silent=True) or {}
-    event = payload.get("event")
-    if event not in ("detail_click", "interaction"):
-        return jsonify(error="unknown event"), 400
-
-    target = (payload.get("target") or "")[:64] or None
-    store.record(now(), visitor_id, EXPERIMENT, assign(visitor_id, SALT, SPLIT),
-                 event, target)
-    return "", 204
+    # Opted out or non-human: expose() returns None, so serve the control
+    # layout, set no cookie, log nothing. These visits are outside the
+    # experiment entirely rather than being counted as a silent arm.
+    variant = EXP.expose()
+    return render_template("dashboard.html", variant=variant or "A",
+                           tracking=variant is not None, experiment=EXP.name,
+                           snap=SNAP, chat_enabled=chat.enabled())
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -159,17 +77,6 @@ def ask():
 @app.route("/healthz")
 def healthz():
     return "ok", 200
-
-
-@app.route("/api/stats")
-def stats():
-    """Live counts. Deliberately NOT a p-value.
-
-    Exposing significance here would make peeking one click away, and the
-    pre-registration commits to a single analysis at a fixed horizon. Run
-    analysis/report.py when the experiment ends.
-    """
-    return jsonify(experiment=EXPERIMENT, counts=store.counts(EXPERIMENT))
 
 
 if __name__ == "__main__":

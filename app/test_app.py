@@ -11,14 +11,14 @@ import sys
 
 import pytest
 
-from assignment import assign, bucket
+from ablab.assignment import assign, bucket
 
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("AB_DB_PATH", str(tmp_path / "t.db"))
     monkeypatch.setenv("COOKIE_SECURE", "0")
-    for mod in ("store", "chat", "app"):
+    for mod in ("chat", "app"):
         sys.modules.pop(mod, None)
     app_mod = importlib.import_module("app")
     app_mod.app.config["TESTING"] = True
@@ -63,7 +63,7 @@ def test_buckets_span_the_range():
 # --- exposure logging ----------------------------------------------------
 
 def test_visit_sets_cookie_and_logs_one_exposure(client):
-    import store
+    from ablab import store
     r = client.get("/")
     assert r.status_code == 200
     assert "ab_vid" in r.headers.get("Set-Cookie", "")
@@ -74,7 +74,7 @@ def test_visit_sets_cookie_and_logs_one_exposure(client):
 def test_repeat_visits_do_not_double_count(client):
     """A refresh must not inflate the denominator. The unique index enforces
     this in the schema, because application-level dedup drifts."""
-    import store
+    from ablab import store
     for _ in range(6):
         client.get("/")
     counts = store.counts("exp001_layout")
@@ -115,10 +115,10 @@ def test_arms_differ_only_in_block_order(client):
 def test_every_load_is_a_pageview_but_only_one_exposure(client):
     """Returning visits are countable without inflating the denominator."""
     import sqlite3
-    import store
+    from ablab import store
     for _ in range(3):
         client.get("/")
-    rows = sqlite3.connect(store.DB_PATH).execute(
+    rows = sqlite3.connect(store.db_path()).execute(
         "SELECT event, COUNT(*) FROM events GROUP BY event").fetchall()
     assert dict(rows) == {"exposure": 1, "pageview": 3}
 
@@ -131,9 +131,9 @@ def test_every_load_is_a_pageview_but_only_one_exposure(client):
 ])
 def test_device_class_is_stored_not_the_user_agent(client, ua, expected):
     import sqlite3
-    import store
+    from ablab import store
     client.get("/", headers={"User-Agent": ua})
-    rows = sqlite3.connect(store.DB_PATH).execute(
+    rows = sqlite3.connect(store.db_path()).execute(
         "SELECT DISTINCT device FROM events").fetchall()
     assert rows == [(expected,)]
 
@@ -142,8 +142,8 @@ def test_device_class_is_stored_not_the_user_agent(client, ua, expected):
 def test_click_is_attributed_to_the_server_side_variant(client):
     """The client sends an event name, never an arm. If the body could set the
     variant, anyone could skew the result by hand."""
-    import store
-    from assignment import assign as _assign
+    from ablab import store
+    from ablab.assignment import assign as _assign
     client.get("/")
     vid = next(c.value for c in client._cookies.values()) if hasattr(client, "_cookies") \
         else client.get_cookie("ab_vid").value
@@ -157,7 +157,7 @@ def test_click_is_attributed_to_the_server_side_variant(client):
 
 
 def test_event_without_exposure_is_dropped(client):
-    import store
+    from ablab import store
     r = client.post("/api/events", json={"event": "detail_click"})
     assert r.status_code == 204
     assert store.counts("exp001_layout") == {}
@@ -172,7 +172,7 @@ def test_unknown_event_rejected(client):
 
 @pytest.mark.parametrize("header", [{"DNT": "1"}, {"Sec-GPC": "1"}])
 def test_opt_out_logs_nothing_and_sets_no_cookie(client, header):
-    import store
+    from ablab import store
     r = client.get("/", headers=header)
     assert r.status_code == 200
     assert "ab_vid" not in r.headers.get("Set-Cookie", "")
@@ -180,7 +180,7 @@ def test_opt_out_logs_nothing_and_sets_no_cookie(client, header):
 
 
 def test_bots_are_excluded(client):
-    import store
+    from ablab import store
     client.get("/", headers={"User-Agent": "Googlebot/2.1"})
     assert store.counts("exp001_layout") == {}
 
@@ -216,7 +216,7 @@ def test_chat_is_off_without_a_key(client, monkeypatch):
 
 def test_chat_answers_and_logs_no_events(chat_client):
     """Chat is outside the experiment: asking must not touch the events table."""
-    import store
+    from ablab import store
     chat_client.get("/")
     before = store.counts("exp001_layout")
     r = chat_client.post("/api/chat", json={"question": "which sector is highest?"})
