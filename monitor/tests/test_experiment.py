@@ -3,6 +3,7 @@ still produce a plausible-looking result if it broke: a visitor counted twice, a
 the browser chose, a conversion the server never saw, content refreshed mid-test."""
 import importlib
 import json
+import re
 import sqlite3
 import sys
 from types import SimpleNamespace
@@ -37,10 +38,8 @@ def live(monkeypatch, sqlite_db, tmp_path):
                     COOKIE_SECURE="0")
 
 
-def render_as(app, vid):
-    """Run the render callback as visitor `vid` would trigger it."""
-    with app.server.test_request_context(headers={**UA, "Cookie": f"ab_vid={vid}"}):
-        return app.render("total postings", 3, app.DEFAULT_WINDOW, 10, [], ["shared"], "light", None)
+def ids_in_order(page_json: str) -> list[str]:
+    return re.findall(r'"id":\s*"(tiles|trend|rank)"', page_json)
 
 
 def test_off_by_default_logs_nothing(monkeypatch, sqlite_db, tmp_path):
@@ -68,27 +67,21 @@ def test_bots_see_control_and_are_not_counted(live):
     assert store.counts("exp_t") == {}
 
 
-def test_arm_changes_only_the_color_encoding(live):
-    a_vid = next(f"v{i}" for i in range(100) if assign(f"v{i}", "s1") == "A")
-    b_vid = next(f"v{i}" for i in range(100) if assign(f"v{i}", "s1") == "B")
-    a, b = render_as(live, a_vid), render_as(live, b_vid)
-    assert a[-1].startswith("Change by sector · grey") and "blue = growing" in b[-1]
-    # Serialized as the browser receives them, only the ranking figure and its key differ.
-    enc = lambda x: json.dumps(x, cls=plotly.utils.PlotlyJSONEncoder, sort_keys=True)
-    assert [i for i, (x, y) in enumerate(zip(a, b)) if enc(x) != enc(y)] == [4, 11]
+def test_arms_differ_only_in_section_order(live):
+    enc = lambda c: json.dumps(c, cls=plotly.utils.PlotlyJSONEncoder, sort_keys=True)
+    a = live.LAYOUTS["A"]["page-dashboard"].children
+    b = live.LAYOUTS["B"]["page-dashboard"].children
+    assert sorted(map(enc, a)) == sorted(map(enc, b)), "same components, nothing added or lost"
+    assert ids_in_order(enc(live.LAYOUTS["A"])) == ["tiles", "trend", "rank"]
+    assert ids_in_order(enc(live.LAYOUTS["B"])) == ["trend", "rank", "tiles"]
 
 
-def test_within_variation_sector_is_grey_in_a_only(live):
-    m = dict(live.compute("total postings", 52))
-    m["sec"] = m["sec"].copy()
-    quiet = m["sec"].index[0]
-    m["sec"].loc[quiet, "beyond"] = False
-    t = hd.THEMES["light"]
-    bars = lambda fig: {y: tr.marker.color for tr in fig.data if tr.type == "bar" for y in tr.y}
-    a = bars(live.fig_ranking(m, t, 10, None))
-    b = bars(live.fig_ranking(m, t, 10, None, color_all=True))
-    assert a[quiet] == t["muted"] and b[quiet] in (t["up"], t["down"])
-    assert {k: v for k, v in a.items() if k != quiet} == {k: v for k, v in b.items() if k != quiet}
+def test_each_visitor_gets_their_arms_layout(live):
+    for i in range(6):
+        c = live.server.test_client()
+        page = c.get(LAYOUT, headers=UA).get_data(as_text=True)
+        arm = assign(c.get_cookie("ab_vid").value, "s1")
+        assert ids_in_order(page)[0] == ("tiles" if arm == "A" else "trend")
 
 
 def test_drill_through_is_logged_server_side(live, monkeypatch):

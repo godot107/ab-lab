@@ -25,7 +25,8 @@ Hiring Lab's public Job Postings Index, deployed to AWS EC2. See README.md for t
 - Deploy: `deploy/0*.sh` (EC2 via CloudFormation, Caddy HTTPS). Lint before pushing:
   `cfn-lint infra/ec2.yaml` and ShellCheck (`docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P deploy deploy/*.sh app/entrypoint.sh`).
 - **Experiments (ablab).** Off unless `AB_EXPERIMENT` is set (then `AB_SALT` is required and never
-  changes mid-test). Exposure = the `/_dash-layout` fetch; callbacks recompute the arm from the
-  cookie via `arm()`, never from client input; drill-throughs are logged server-side in `on_click`.
+  changes mid-test). Exposure = the `/_dash-layout` fetch, which recomputes the arm from the
+  cookie, and picks `LAYOUTS[arm]` (exp001: arm B puts the chart grid above the KPI tiles; nothing
+  else differs). Drill-throughs are logged server-side in `on_click` as the conversion.
   While an experiment is live, `build_hiringlab.py` refuses to refresh. The image gets `ablab` via a
   compose `additional_contexts` (`ABLAB_DIR`, default `../ablab`).
