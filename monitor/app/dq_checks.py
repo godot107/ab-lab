@@ -167,6 +167,17 @@ def check_grain(d: dict, today) -> CheckResult:
 def check_freshness(d: dict, today) -> CheckResult:
     latest = d["national"]["date"].max()
     age = (today - latest).days
+    if os.environ.get("AB_EXPERIMENT"):
+        # Frozen on purpose: the data is something both arms hold constant, so the
+        # refresh is off. Failing here would flip the header badge red mid-experiment,
+        # changing the page under both arms at once. Say so instead of hiding the age.
+        return CheckResult(name="Freshness", dimension="Timeliness", severity="block", passed=True,
+                           observed=f"{age} days old, frozen for experiment {os.environ['AB_EXPERIMENT']} "
+                                    f"(data through {latest:%b %d, %Y})",
+                           expected=f"≤ {FRESHNESS_DAYS} days, or frozen for a live experiment",
+                           detail="Refresh resumes when the experiment ends (AB_EXPERIMENT unset).",
+                           evidence=[{"latest_date": f"{latest:%Y-%m-%d}", "today": f"{today:%Y-%m-%d}",
+                                      "age_days": age, "frozen_for": os.environ["AB_EXPERIMENT"]}])
     return CheckResult(name="Freshness", dimension="Timeliness", severity="block", passed=age <= FRESHNESS_DAYS,
                        observed=f"{age} days old (data through {latest:%b %d, %Y})",
                        expected=f"≤ {FRESHNESS_DAYS} days",

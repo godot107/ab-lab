@@ -2,10 +2,13 @@
 
 simulate.py validates the statistics in memory. This validates the *pipeline*:
 real HTTP requests, real cookies, the server's own bucketing, exposure rows,
-beacons, SQLite -- then report.py reads the result like any other experiment.
-The true effect is set here, so the readout can be checked against it.
+the collector, SQLite -- then report.py reads the result like any other
+experiment. The true effect is set here, so the readout can be checked against it.
 
-    python analysis/synthetic_traffic.py --url http://localhost:5000
+Targets the Hiring Demand Monitor (monitor/): a visit is the page plus the
+layout fetch that logs the exposure, and a conversion is a drill_through.
+
+    python analysis/synthetic_traffic.py --url http://localhost:8050
     python analysis/synthetic_traffic.py --url https://ab.example.com --visitors 800 --lift 0.10
 
 Point it ONLY at a deployment whose AB_EXPERIMENT is a demo name (the EC2 POC
@@ -26,8 +29,9 @@ from http.cookiejar import CookieJar
 
 # Deliberately not matching the app's bot filter, or nothing would be logged.
 USER_AGENT = "ab-lab-synthetic/1.0 (demo traffic; see analysis/synthetic_traffic.py)"
-TARGETS = ["total", "new", "yoy", "sectors", "trend"]
-FIRST_BLOCK = re.compile(r'<div class="block (tiles|chart)"')
+TARGETS = ["rank", "trend", "mult", "sector-table", "earnings"]
+# The first of these ids in the layout JSON says which arm the server picked.
+FIRST_SECTION = re.compile(r'"id":\s*"(tiles|trend)"')
 
 
 class Visitor:
@@ -38,12 +42,14 @@ class Visitor:
         self.http.addheaders = [("User-Agent", USER_AGENT)]
 
     def visit(self) -> str:
-        """Load the page; return the arm the SERVER chose, read off the layout."""
-        with self.http.open(f"{self.base}/", timeout=20) as r:
-            html = r.read().decode()
-        m = FIRST_BLOCK.search(html)
+        """Load the page as a browser does (index, then the layout fetch that is the
+        exposure); return the arm the SERVER chose, read off the section order."""
+        self.http.open(f"{self.base}/", timeout=20).close()
+        with self.http.open(f"{self.base}/_dash-layout", timeout=20) as r:
+            layout = r.read().decode()
+        m = FIRST_SECTION.search(layout)
         if not m:
-            raise RuntimeError("couldn't tell the layout apart -- template changed?")
+            raise RuntimeError("couldn't tell the layouts apart -- did the section ids change?")
         return "A" if m.group(1) == "tiles" else "B"
 
     def send(self, event: str, target: str) -> None:
@@ -60,9 +66,9 @@ def one_visitor(i: int, args, rates: dict[str, float]) -> tuple[str, bool]:
     arm = v.visit()
     converted = rng.random() < rates[arm]
     if converted:
-        v.send("detail_click", rng.choice(TARGETS))
-        for _ in range(rng.choice([0, 0, 1, 2])):          # a few secondary clicks
-            v.send("interaction", rng.choice(TARGETS))
+        v.send("drill_through", rng.choice(TARGETS))
+        for _ in range(rng.choice([0, 0, 1, 2])):          # a few repeat drills
+            v.send("drill_through", rng.choice(TARGETS))
     if rng.random() < args.return_rate:
         # A returning visitor must see the same layout. If not, stickiness is
         # broken and every number downstream is meaningless -- fail loudly.
@@ -76,7 +82,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--url", required=True)
     ap.add_argument("--visitors", type=int, default=600)
-    ap.add_argument("--baseline", type=float, default=0.30, help="true detail_ctr in A")
+    ap.add_argument("--baseline", type=float, default=0.30, help="true drill-through rate in A")
     ap.add_argument("--lift", type=float, default=0.12,
                     help="true absolute lift in B; 0 for an A/A test")
     ap.add_argument("--return-rate", type=float, default=0.2)
@@ -89,7 +95,7 @@ def main() -> None:
         results = list(pool.map(lambda i: one_visitor(i, args, rates), range(args.visitors)))
 
     print(f"Sent {len(results)} synthetic visitors to {args.url}")
-    print(f"Ground truth: detail_ctr A = {rates['A']:.1%}, B = {rates['B']:.1%} "
+    print(f"Ground truth: drill-through rate A = {rates['A']:.1%}, B = {rates['B']:.1%} "
           f"(lift {args.lift:+.1%})")
     for arm in "AB":
         conv = [c for a, c in results if a == arm]

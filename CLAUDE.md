@@ -19,7 +19,7 @@ on; `ablab/` is the experimentation layer that mounts on its Flask server.
 python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r analysis/requirements.txt -e .
 cd app && source ../.venv/bin/activate   # own venv: anthropic is pinned
 AB_DB_PATH=/tmp/ab.db COOKIE_SECURE=0 python app.py   # localhost:5000
-python -m pytest -q                                    # 27 tests (+5 in analysis/, +5 in ablab/)
+python -m pytest -q                                    # 27 tests (+5 in analysis/, +6 in ablab/, 36 in monitor/)
 ```
 
 ```bash

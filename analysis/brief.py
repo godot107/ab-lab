@@ -33,7 +33,10 @@ from analysis.stats import ALPHA, mde, srm_check, two_proportion_test  # noqa: E
 # Pre-registered stopping rule, docs/experiment_design.md section 5.
 TARGET_PER_ARM = 250
 MAX_DAYS = 28
-TARGET_LABEL = {"trend": "Chart", "total": "Tile: all postings", "new": "Tile: new postings",
+# Drill-through sources on the monitor; the legacy app/ demo's tile names kept for old dbs.
+TARGET_LABEL = {"rank": "Sector ranking", "trend": "Trend chart", "mult": "Small multiples",
+                "sector-table": "Sector table", "earnings": "Earnings panel",
+                "total": "Tile: all postings", "new": "Tile: new postings",
                 "yoy": "Tile: vs. a year ago", "sectors": "Tile: sectors above 2020"}
 
 
@@ -64,7 +67,7 @@ class Data:
         return [x for x in self.visitors.values() if x.variant == v]
 
 
-def load(db: Path, experiment: str) -> Data:
+def load(db: Path, experiment: str, conversion: str = "drill_through") -> Data:
     conn = sqlite3.connect(db)
     rows = conn.execute(
         "SELECT ts, visitor_id, variant, event, target, device FROM events"
@@ -82,9 +85,9 @@ def load(db: Path, experiment: str) -> Data:
             orphans += 1
         elif event == "pageview":
             visitors[vid].pageviews += 1
-        elif event == "detail_click" and visitors[vid].first_click is None:
+        elif event == conversion and visitors[vid].first_click is None:
             visitors[vid].first_click, visitors[vid].first_target = t, target
-        elif event == "interaction":
+        elif event in (conversion, "interaction"):   # any later click counts as exploring
             visitors[vid].interactions += 1
 
     chat = {}
@@ -145,11 +148,11 @@ def usage(vs: list[Visitor]) -> dict:
 
 
 def usage_lines(u: dict) -> list[str]:
-    lines = [f"- **Opened the sector breakdown:** {pct(u['opened'])} of {u['n']:,} visitors."]
+    lines = [f"- **Drilled into the data:** {pct(u['opened'])} of {u['n']:,} visitors."]
     if u["median_secs"] is not None:
         lines.append(f"- **Time to first click:** median {u['median_secs']:.0f} seconds after the page loaded.")
     if u["explored"] is not None:
-        lines.append(f"- **Kept exploring:** {pct(u['explored'])} of those who opened it clicked again.")
+        lines.append(f"- **Kept exploring:** {pct(u['explored'])} of those who drilled in did it again.")
     lines.append(f"- **Came back:** {pct(u['returning'])} of visitors loaded the page more than once.")
     return lines
 
@@ -196,9 +199,10 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
                 "evidence about real users.", ""]
 
     out += ["## The question", "",
-            "Does putting the trend chart first, instead of the KPI tiles, get more people "
-            "to open the breakdown by occupational sector? Opening the breakdown is the "
-            "measure of whether the dashboard invites a second question. The measure, the "
+            "Does putting the charts first (the trend and the sector ranking), instead of "
+            "the KPI tiles, get more people to drill into the rows behind a number? "
+            "Drilling in is the measure of whether the dashboard invites a second "
+            "question. The measure, the "
             "sample size and the decision rule were fixed before any data arrived "
             "(`docs/experiment_design.md`).", ""]
 
@@ -250,24 +254,24 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
     lo, hi = res.ci
     detectable = mde(smaller, res.p_a)
     if res.significant and res.abs_lift > 0:
-        decision = "Adopt layout B (chart first)."
-        verdict = (f"Putting the chart first raised the share of visitors who opened the "
-                   f"sector breakdown from {pct(res.p_a)} to {pct(res.p_b)}, "
+        decision = "Adopt layout B (charts first)."
+        verdict = (f"Putting the charts first raised the share of visitors who drilled "
+                   f"into the data from {pct(res.p_a)} to {pct(res.p_b)}, "
                    f"a gain of {res.abs_lift * 100:.0f} points.")
     elif res.significant:
         decision = "Keep layout A (tiles first)."
-        verdict = (f"Putting the chart first *lowered* the share of visitors who opened the "
-                   f"sector breakdown, from {pct(res.p_a)} to {pct(res.p_b)}.")
+        verdict = (f"Putting the charts first *lowered* the share of visitors who drilled "
+                   f"into the data, from {pct(res.p_a)} to {pct(res.p_b)}.")
     else:
         decision = "No change: keep layout A, the current default."
         verdict = (f"The two layouts could not be told apart: {pct(res.p_a)} of visitors "
-                   f"opened the breakdown with A, {pct(res.p_b)} with B.")
+                   f"drilled in with A, {pct(res.p_b)} with B.")
 
     out += ["## Bottom line", "", f"**{decision}** {verdict}", "",
             "## The evidence", "",
-            md_table(["", "Layout A (tiles first)", "Layout B (chart first)"],
+            md_table(["", "Layout A (tiles first)", "Layout B (charts first)"],
                      [["Visitors", f"{res.n_a:,}", f"{res.n_b:,}"],
-                      ["Opened the breakdown", f"{res.x_a:,}", f"{res.x_b:,}"],
+                      ["Drilled into the data", f"{res.x_a:,}", f"{res.x_b:,}"],
                       ["**Rate**", f"**{pct(res.p_a, 1)}**", f"**{pct(res.p_b, 1)}**"]]), "",
             f"- **Difference:** {pts(res.abs_lift)} for B. Plausible range, given the "
             f"sample: {pts(lo)} to {pts(hi)}.",
@@ -284,7 +288,7 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
             f"{TARGET_PER_ARM:,}.",
             "- **Audience:** visitors to a portfolio site, mostly recruiters and peers. The "
             "result describes this audience, not every dashboard user.",
-            "- **What it measures:** whether people dig into the breakdown, which is "
+            "- **What it measures:** whether people dig into the data, which is "
             "engagement, not proof of usefulness. A layout that answers the question "
             "faster could lower it.",
             "- **Not checked:** page speed and error rates were not instrumented, so the "
@@ -312,9 +316,9 @@ def usage_rows(ua: dict, ub: dict) -> list[list[str]]:
 
     def maybe(x):
         return "n/a" if x is None else pct(x)
-    return [["Opened the breakdown", pct(ua["opened"]), pct(ub["opened"])],
+    return [["Drilled into the data", pct(ua["opened"]), pct(ub["opened"])],
             ["Median time to first click", secs(ua), secs(ub)],
-            ["Kept exploring (of openers)", maybe(ua["explored"]), maybe(ub["explored"])],
+            ["Kept exploring (of those who drilled in)", maybe(ua["explored"]), maybe(ub["explored"])],
             ["Came back", pct(ua["returning"]), pct(ub["returning"])]]
 
 
@@ -341,12 +345,14 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--db", default="data/events.db")
     ap.add_argument("--experiment", default="exp001_layout")
+    ap.add_argument("--conversion", default="drill_through",
+                    help="the pre-registered primary event (detail_click for the legacy app/ demo)")
     ap.add_argument("--final", action="store_true",
                     help="require the final brief; refuses if the stopping rule isn't met")
     ap.add_argument("--out", type=Path, help="write Markdown here instead of stdout")
     args = ap.parse_args()
 
-    text = render(load(Path(args.db), args.experiment), args.experiment, args.final)
+    text = render(load(Path(args.db), args.experiment, args.conversion), args.experiment, args.final)
     if args.out:
         args.out.write_text(text + "\n")
         print(f"wrote {args.out}")

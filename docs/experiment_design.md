@@ -1,113 +1,121 @@
-# Experiment 001 — Dashboard layout and engagement
+# Experiment 001 — Charts first or tiles first on the Hiring Demand Monitor
 
 **Status:** pre-registered, not yet started
 **Author:** godot107
 **Pre-registered on:** (fill in the date you lock this file — before any traffic)
+**Data frozen at:** (fill in the monitor's "Data through" date when the experiment starts)
 
 This document is written *before* the experiment runs and is not edited after
 traffic starts. That is the whole point: everything below is a commitment made
 while the outcome is still unknown, so the analysis can't be reverse-engineered
 from the result. Amendments go in a dated appendix, never as an edit.
 
+*Revision note, written before any traffic:* an earlier draft of exp001 ran on
+the small Flask dashboard in `app/` and measured opening a by-sector
+breakdown. With no traffic collected, it was rewritten for the Hiring Demand
+Monitor (`monitor/`), which is the product. A colour-encoding treatment was
+also considered and rejected: at default settings almost every one-year move
+is beyond its ±3σ limit, so the arms would have differed by one bar of twenty.
+
 ---
 
 ## 1. Hypothesis
 
-Leading a labor-market dashboard with a single headline chart, instead of a
-row of KPI tiles, increases the share of visitors who open the breakdown by
-occupational sector.
+Leading the Hiring Demand Monitor with its charts (the national trend and the
+sector ranking) instead of its row of KPI tiles increases the share of visitors
+who drill through to the rows behind a number.
 
-The surface is a US job-postings report built on Indeed Hiring Lab's public Job
-Postings Index (CC BY 4.0): the national index, new postings, year-over-year
-change, and a breakdown across Hiring Lab's 47 occupational sectors. The data
-is real and cited, and it is the dataset the role would actually work with.
+The surface is the monitor: an interactive dashboard on Indeed Hiring Lab's
+public Job Postings Index (CC BY 4.0) with a computed headline, four KPI tiles,
+a national trend chart, a ranking of 47 occupational sectors, small multiples,
+an earnings panel and a sector table. Almost every mark can be clicked to open
+a drill-through panel showing the records behind it, with the arithmetic.
 
-The content is a snapshot pinned to one upstream commit
-(`9177c58`, data through 2026-09-11) and frozen for the whole window --
-see `data/build_snapshot.py`. The numbers are something both arms hold
-constant; a live feed would change them under the experiment.
+**Why it might be true.** KPI tiles answer "what is the number?" completely and
+immediately, which can end the session. A chart answers it while raising
+"why?", and on this dashboard "why?" is one click away.
 
-**Why it might be true.** KPI tiles answer the question "what is the number?"
-completely and immediately, which can end the session. A chart answers "what is
-the number?" while raising "why?", which is the question a detail view exists to
-serve.
-
-**Why it might be false.** The chart is slower to parse. Visitors who wanted a
-number and got a trend line may bounce instead of digging in.
+**Why it might be false.** Charts are slower to parse than tiles. Visitors who
+came for a number and got a trend line may leave instead of digging in.
 
 Both directions are plausible, which is the honest test for whether an
 experiment is worth running.
 
 ## 2. Variants
 
-| | Layout |
+| | Order of the dashboard page |
 |---|---|
-| **A (control)** | Four KPI tiles on top (all postings, new postings, vs. a year ago, sectors above Feb 2020), 12-month chart below (Indeed postings index, with BLS JOLTS job openings as a benchmark line) |
-| **B (treatment)** | 12-month index chart on top, the same four tiles below |
+| **A (control)** | Headline · KPI tiles · trend chart + sector ranking · (everything below) |
+| **B (treatment)** | Headline · trend chart + sector ranking · KPI tiles · (everything below) |
 
-Identical data, identical detail view, identical styling. The layout order is
-the only difference. Anything else that differs is a confound;
-`test_arms_differ_only_in_block_order` renders both arms and checks it.
+Same components, same ids, same callbacks, same data, same styling. Only the
+order of two blocks differs. `test_arms_differ_only_in_section_order`
+(`monitor/tests/test_experiment.py`) serializes both layouts and checks that
+they contain exactly the same components; `test_each_visitor_gets_their_arms_layout`
+checks that each visitor is served their own arm's order.
 
-**Held constant in both arms, and outside the metrics:**
+**Held constant in both arms:**
 
-- *The chart library.* Plotly (basic bundle, self-hosted) with hover tooltips
-  only -- zoom and pan are disabled, so the chart offers no second kind of
-  interaction on the element under test. It costs ~390 KB gzipped, which both
-  arms pay equally; the LCP guardrail covers it.
-- *The "Ask about this data" box,* below the detail view. A single-turn Claude
-  call grounded in the snapshot, capped per visitor and site-wide. No events
-  are logged for it, and it is excluded from every metric. It is decided before
-  traffic starts: switching it on or off mid-window would change the page under
-  both arms at once, which the SRM check cannot see.
+- *The data.* Frozen when the experiment starts. While `AB_EXPERIMENT` is set,
+  `build_hiringlab.py` refuses to refresh (tested), so the daily timer is a
+  no-op. The freshness check reports "frozen for experiment …" instead of
+  failing, so the header's data-quality badge cannot turn red mid-window and
+  change the page under both arms at once (tested).
+- *The filters' defaults* (total postings, compare to 1 year, Jan 2022 to the
+  latest date, top and bottom 10 sectors) and the other tabs.
+- *Interactivity.* Hover, filters and drill-through work identically in both
+  arms. The chart library and its bundle are the same.
 
 ## 3. Randomization
 
 - **Unit:** visitor, not pageview. A visitor who sees layout A must keep seeing
   layout A on every visit; mixed exposure makes the result uninterpretable.
-- **Identifier:** first-party UUID, generated on first visit, stored client-side.
+- **Identifier:** a random first-party UUID in an HttpOnly cookie, set on first
+  visit. No IP and no user agent are stored.
+- **Exposure:** the layout fetch (`/_dash-layout`) that every page load makes.
+  It assigns the arm, logs one `exposure` row per visitor (a unique index
+  enforces it) and a `pageview` row on every load, and returns that arm's
+  layout.
 - **Assignment:** deterministic hash of `visitor_id + experiment_salt`, bucketed
-  into 100 slots, 0-49 -> A, 50-99 -> B. Deterministic means assignment is
-  reproducible from the ID alone and needs no lookup table.
+  into 100 slots, 0-49 -> A, 50-99 -> B. Reproducible from the ID alone, with
+  no lookup table. The browser never reports its arm; the server recomputes it
+  from the cookie for every event.
 - **Split:** 50/50. Equal allocation maximizes power per visitor.
 
 ## 4. Metrics
 
 **Primary (the one the decision is made on — exactly one):**
-- `detail_ctr` = visitors who opened the by-sector breakdown / visitors exposed
+- `drill_rate` = exposed visitors with at least one `drill_through`
+  / exposed visitors
+
+A `drill_through` is logged by the server when a click opens the drill-through
+panel, from any source: a ranking bar, a trend point, a small multiple, a
+table row or an earnings bar. The source is stored in `target`.
 
 **Secondary (context, never the decision):**
-- interactions per exposed visitor
-- time from exposure to first interaction
-- ~~scroll depth reaching the tiles/chart below the fold~~ — *not instrumented
-  in this build; dropped rather than claimed*
+- repeat drill-throughs: share of drilling visitors who drilled more than once
+- time from exposure to first drill-through
+- ~~filter use~~ — *not instrumented; dropped rather than claimed*
 
 **Guardrails (a win that breaks one of these is not a win):**
 - ~~Largest Contentful Paint, p75~~ and ~~client JS error rate~~ — *not
-  instrumented in this build.* Both need a client beacon the collector doesn't
-  have yet. Adding them means adding them *before* a run's traffic starts,
-  never after.
-- ~~bounce rate (exposed, zero interactions)~~ — *dropped: not independent.*
-  Every `interaction` follows a first `detail_click`, so "zero interactions"
-  is exactly 1 − `detail_ctr`. A guardrail that is the primary metric's mirror
-  image can never catch anything. A real bounce measure needs dwell time or
-  scroll, which aren't collected.
+  instrumented in this build.* Both need a client beacon. Adding them means
+  adding them *before* a run's traffic starts, never after.
 
 **So this build has no guardrail.** The decision rule below is stated
 accordingly, and the readout must say so.
 
 **Descriptive usage (context only; reported pooled while the test runs):**
-- first-click element (chart vs. each tile), from `detail_click.target`
-- returning visitors: share with more than one `pageview` (logged on every
-  load, separately from the once-per-visitor `exposure`)
+- first drill source (ranking, trend, small multiples, table, earnings), from
+  `drill_through.target`
+- returning visitors: share with more than one `pageview`
 - device mix: a coarse `device` class (mobile / tablet / desktop) stored on
   exposure and pageview rows; the user agent itself is never stored
-- chat demand: question counts per day, never the questions
 
-Everything above is derivable from the events table as it stands
-(`exposure`, `pageview`, `detail_click`, `interaction`, with timestamps,
-targets and device class). Synthetic demo traffic records its device as
-`synthetic`, so it can never pass for real visitors in a readout.
+Everything above is derivable from the events table as it stands (`exposure`,
+`pageview`, `drill_through`, with timestamps, targets and device class).
+Synthetic demo traffic records its device as `synthetic`, so it can never pass
+for real visitors in a readout.
 
 **Diagnostic (run before looking at any metric):**
 - Sample Ratio Mismatch. Chi-square on observed vs. expected 50/50 exposure
@@ -117,8 +125,8 @@ targets and device class). Synthetic demo traffic records its device as
 
 ## 5. Sample size and stopping rule
 
-Baseline `detail_ctr` assumed at 30% (revise from real traffic once the
-control-only warm-up period has run). Two-sided alpha = 0.05, power = 0.80:
+Baseline `drill_rate` assumed at 30% (a planning value; no real traffic has
+been seen). Two-sided alpha = 0.05, power = 0.80, from `analysis/stats.py`:
 
 | Relative lift to detect | Absolute | n per arm | Total visitors |
 |---|---|---|---|
@@ -140,6 +148,10 @@ Read the other direction — what a given traffic budget can actually detect:
 | 1,000 | 2,000 | 5.9 pp | 20% |
 | 2,500 | 5,000 | 3.7 pp | 12% |
 
+If the real baseline is lower than 30%, every detectable lift above is larger
+in relative terms. The readout states the smallest lift its sample could have
+detected at the observed baseline, not at this planning value.
+
 **The constraint this project is honest about.** A portfolio site does not get
 Indeed's traffic. At a realistic few hundred visitors, this experiment can only
 detect an effect so large that no real layout change would produce it. That is
@@ -157,8 +169,8 @@ So the project reports two things, clearly separated:
    positive rate at 5% when there is no effect, and quantifies what peeking does
    to that rate.
 
-**Stopping rule:** fixed horizon. Pre-declare the stop condition — first of
-`n >= 250 per arm` or `28 days` — and analyze *once*, at the end.
+**Stopping rule:** fixed horizon. Stop at the first of `n >= 250 per arm` or
+`28 days`, and analyze *once*, at the end.
 
 **No peeking.** Checking significance daily and stopping at the first p < 0.05
 inflates the false positive rate far above the nominal 5%. `analysis/simulate.py`
@@ -168,27 +180,42 @@ test, not a bare repeated z-test.
 
 ## 6. Decision rule (committed in advance)
 
-- **Ship B** if `detail_ctr` lift is significant at alpha = 0.05 and
-  positive. (No guardrail is instrumented -- see section 4. A full run should
+- **Ship B** if the `drill_rate` lift is significant at alpha = 0.05 and
+  positive. (No guardrail is instrumented — see section 4. A full run should
   add the LCP and JS-error beacons first.)
 - **Keep A** if significant and negative.
 - **Inconclusive** otherwise — report the confidence interval and the effect
   size the test was actually powered for. Inconclusive is a real outcome and
   gets written up as one, not re-cut until something turns significant.
 
+The analysis is `python analysis/report.py --db <db> --experiment exp001_layout`
+(conversion event `drill_through`, the default).
+
 ## 7. Threats to validity, stated up front
 
-- **Low traffic** — the dominant limitation; see section 5.
-- **Novelty effect** — repeat visitors reacting to a layout *change* rather than
-  the layout. Partly mitigated by reporting first-time visitors separately.
-- **Non-representative traffic** — visitors arriving from a LinkedIn post are
+- **Low traffic.** The dominant limitation; see section 5.
+- **Position is part of the treatment.** Moving the charts up also moves two
+  of the drill-through targets (ranking bars, trend points) higher on the
+  page. B may win simply because those targets are easier to reach, not
+  because charts invite questions. This test cannot separate the two; it
+  answers "which order", not "why".
+- **Screen size.** On a phone the blocks stack, so the swap moves the tiles a
+  long way down in B. Device class is recorded; a per-device cut is
+  exploratory only.
+- **Novelty effect.** Repeat visitors may react to a layout *change* rather than
+  the layout. Not mitigated in this build: the share of returning visitors is
+  reported, but there is no first-visit-only cut.
+- **Non-representative traffic.** Visitors arriving from a LinkedIn post are
   not a random sample of anything; they skew toward recruiters and peers. The
   result generalizes to this site's audience and no further.
-- **Bot traffic** — inflates exposures with zero clicks and dilutes the effect.
-  Filtered by a user-agent substring list (`BOT_MARKERS` in `app/app.py`),
-  applied identically to both arms and declared here rather than tuned later.
-  No dwell-time filter: an earlier draft named one, but it isn't built.
-- **Single surface, single metric** — one layout change on one dashboard. No
+- **Bot traffic.** Inflates exposures with zero clicks and dilutes the effect.
+  Filtered by a user-agent substring list (`BOT_MARKERS` in
+  `ablab/flask_ext.py`), applied identically to both arms and declared here
+  rather than tuned later. Do Not Track and Global Privacy Control are honored
+  the same way: those visitors see A and are never logged.
+- **Aging data.** The content is frozen, so by day 28 the "data through" date
+  is a month old. Both arms see the same age on the same day.
+- **Single surface, single metric.** One layout change on one dashboard. No
   claim is made about dashboards in general.
 
 ## 8. Reporting to stakeholders
@@ -211,18 +238,19 @@ leads for the next experiment, never part of this decision.
 ## 9. Scope of the proof-of-concept deployment
 
 The design above is for a full run: 28 days or 250 visitors per arm. The EC2
-proof of concept (`deploy/up.sh`) is not that run. It exists for days, not
-weeks, and uses a separate experiment name, `exp001_demo`, so nothing it
-collects can be mistaken for `exp001_layout`.
+proof of concept is not that run. It exists for days, not weeks, and uses a
+separate experiment name, `exp001_demo`, so nothing it collects can be
+mistaken for `exp001_layout`.
 
 What the POC demonstrates, and how:
 
 - **The live mechanism.** Sticky assignment, server-side arm attribution,
-  one exposure per visitor -- visible by opening the site in two browsers.
+  one exposure per visitor — visible by opening the monitor in two browsers.
 - **The pipeline, end to end, against known truth.**
   `analysis/synthetic_traffic.py` sends synthetic visitors with a hand-set
-  effect through the real endpoints; `report.py` then reads the result.
-  Synthetic data is labelled as such everywhere it appears.
+  effect through the monitor's real endpoints; `report.py` and `brief.py`
+  then read the result. Synthetic data is labelled as such everywhere it
+  appears.
 - **The statistics.** `analysis/simulate.py`: false positive rate, power, and
   the cost of peeking.
 

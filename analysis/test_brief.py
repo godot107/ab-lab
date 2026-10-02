@@ -22,7 +22,7 @@ def make_db(path: Path, per_arm: int, rate_a: float, rate_b: float, device="desk
             store.record(ts, vid, "exp", arm, "exposure", device=device, path=path)
             store.record(ts, vid, "exp", arm, "pageview", device=device, path=path)
             if i < rate * per_arm:
-                store.record(ts, vid, "exp", arm, "detail_click", "trend", path=path)
+                store.record(ts, vid, "exp", arm, "drill_through", "rank", path=path)
 
 
 def test_interim_brief_hides_the_comparison(tmp_path):
@@ -45,7 +45,7 @@ def test_final_brief_decides_by_the_preregistered_rule(tmp_path):
     db = tmp_path / "e.db"
     make_db(db, 260, 0.30, 0.45)
     text = brief.render(brief.load(db, "exp"), "exp", want_final=True)
-    assert "decision brief" in text and "**Adopt layout B (chart first).**" in text
+    assert "decision brief" in text and "**Adopt layout B (charts first).**" in text
 
 
 def test_null_result_is_not_called_equivalence(tmp_path):

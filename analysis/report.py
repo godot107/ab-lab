@@ -21,10 +21,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default="data/events.db")
     ap.add_argument("--experiment", default="exp001_layout")
+    ap.add_argument("--conversion", default="drill_through",
+                    help="the pre-registered primary event (detail_click for the legacy app/ demo)")
     args = ap.parse_args()
 
     from ablab import store
-    counts = store.counts(args.experiment, path=Path(args.db))
+    counts = store.counts(args.experiment, path=Path(args.db), conversion=args.conversion)
     if set(counts) != {"A", "B"}:
         print(f"Need both arms, got {sorted(counts)}. No traffic yet?")
         return 1
@@ -39,7 +41,7 @@ def main() -> int:
               "below -- fix the pipeline and rerun the experiment.")
         return 2
 
-    print("\nPRIMARY METRIC — detail_ctr\n" + "-" * 60)
+    print(f"\nPRIMARY METRIC — {args.conversion} rate (visitors)\n" + "-" * 60)
     res = two_proportion_test(a["converted"], a["exposed"], b["converted"], b["exposed"])
     print(res)
 

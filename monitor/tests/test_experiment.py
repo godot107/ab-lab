@@ -110,3 +110,14 @@ def test_refresh_is_frozen_while_experiment_is_live(monkeypatch, tmp_path):
     monkeypatch.setenv("AB_EXPERIMENT", "exp_t")
     monkeypatch.setattr(sys, "argv", ["build_hiringlab.py", "--refresh"])
     build.main()
+
+
+def test_frozen_data_reads_as_frozen_not_stale(data, monkeypatch):
+    """A blocking freshness failure would turn the header badge red mid-experiment."""
+    import pandas as pd
+    old = data["national"]["date"].max() + pd.Timedelta(days=40)
+    monkeypatch.delenv("AB_EXPERIMENT", raising=False)
+    assert not q.check_freshness(data, old).passed
+    monkeypatch.setenv("AB_EXPERIMENT", "exp_t")
+    r = q.check_freshness(data, old)
+    assert r.passed and "frozen for experiment exp_t" in r.observed and "40 days old" in r.observed

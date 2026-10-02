@@ -651,7 +651,8 @@ def on_click(rank, trend, earn, mults, cell, _clear, mult_ids):
     elif trig == "sector-table" and cell:
         target = {"kind": "sector", "sector": cell["row_id"]}
     if EXP and isinstance(target, dict):
-        # The conversion, logged server-side: a click the browser can't fabricate.
+        # The conversion, logged when the drill actually opens. The arm comes from the
+        # cookie inside track(), never from the click.
         EXP.track("drill_through", "mult" if isinstance(trig, dict) else trig)
     return target, None, None, None, [None] * len(mult_ids), None
 

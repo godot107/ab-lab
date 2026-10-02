@@ -15,35 +15,31 @@ the hypothesis written down before the data arrives, the sample size worked out
 in advance, the randomizer checked for mismatch before any metric is read, and
 a null result reported as a null result.
 
-The repo also holds [`monitor/`](monitor/), the **Hiring Demand Monitor**: the
-full Dash dashboard and data-quality suite on the same data. It is the product
-the experiments are meant to run on — the `ablab` package mounts on its server
-— and is documented in its own [README](monitor/README.md). Experiment 001 below
-still runs on the simpler Flask dashboard in `app/`.
+The dashboard under test is [`monitor/`](monitor/), the **Hiring Demand
+Monitor**: a Dash dashboard and data-quality suite with its own
+[README](monitor/README.md). The experimentation layer is the `ablab` package
+(assignment, exposure logging, the collector), which mounts on the monitor's
+server. `app/` is the original, smaller Flask demo the method was first built
+on; it still runs and its tests still pass, but exp001 no longer targets it.
 
 ## What it tests
 
-**Does leading a labor-market dashboard with a trend chart, instead of KPI
-tiles, get more people to open the breakdown by occupational sector?**
+**Does leading the Hiring Demand Monitor with its charts, instead of its KPI
+tiles, get more people to drill through to the rows behind a number?**
 
-| | Layout |
+| | Order of the dashboard page |
 |---|---|
-| **A** (control) | KPI tiles on top — all postings, new postings, vs. a year ago, sectors above Feb 2020 — 12-month index chart below |
-| **B** (treatment) | 12-month index chart on top, the same four tiles below |
+| **A** (control) | Headline · KPI tiles · trend chart + sector ranking · the rest |
+| **B** (treatment) | Headline · trend chart + sector ranking · KPI tiles · the rest |
 
-Same data, same detail view, same styling. Only the order differs; anything
-else would be a confound, and a test renders both arms to check it.
+Same components, same data, same styling. Only the order of two blocks
+differs; anything else would be a confound, and a test serializes both layouts
+to check it. The conversion is a drill-through from any chart or table,
+logged by the server when the drill-through panel opens.
 
-The chart adds BLS JOLTS job openings (monthly, public domain), re-based to
-Feb 2020 = 100, as a government benchmark for the postings trend. Plotly draws
-it (basic bundle, self-hosted, hover only). An optional "Ask about this data"
-box sends one question at a time to Claude, grounded in the snapshot, with
-per-visitor and site-wide daily caps; it is identical in both arms and outside
-the metrics.
-
-The data is a snapshot pinned to one upstream commit and frozen for the
-experiment window (`python data/build_snapshot.py` rebuilds it — before traffic
-starts only). Independent project; not affiliated with Indeed.
+The data is frozen while the experiment runs: the daily refresh is a no-op and
+the freshness check reports "frozen" instead of turning the header red.
+Independent project; not affiliated with Indeed.
 
 Full pre-registration: [`docs/experiment_design.md`](docs/experiment_design.md).
 
@@ -54,7 +50,13 @@ python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r an
 cd app && source ../.venv/bin/activate
 AB_DB_PATH=/tmp/ab.db COOKIE_SECURE=0 python app.py    # http://localhost:5000
 python -m pytest -q                                     # 27 tests
-cd .. && python -m pytest -q analysis/ ablab/           # 5 brief + 5 extension tests
+cd .. && python -m pytest -q analysis/ ablab/           # 5 brief + 6 extension tests
+
+# the monitor, with an experiment on (DATA_DIR defaults to monitor/app/var)
+cd monitor && python app/build_hiringlab.py --refresh   # first time only
+AB_EXPERIMENT=exp001_demo AB_SALT=localdemo COOKIE_SECURE=0 AB_DB_PATH=/tmp/m.db \
+  python app/hiringlab_app.py                           # http://localhost:8050
+python -m pytest -q                                     # 36 tests
 ```
 
 Analysis, once the stopping rule is met:
