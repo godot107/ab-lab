@@ -49,7 +49,8 @@ experiment is worth running.
 | **B (treatment)** | Headline · trend chart + sector ranking · KPI tiles · (everything below) |
 
 Same components, same ids, same callbacks, same data, same styling. Only the
-order of two blocks differs. `test_arms_differ_only_in_section_order`
+order of two blocks differs. Screenshots of both arms on desktop and mobile:
+[`variants.md`](variants.md). `test_arms_differ_only_in_section_order`
 (`monitor/tests/test_experiment.py`) serializes both layouts and checks that
 they contain exactly the same components; `test_each_visitor_gets_their_arms_layout`
 checks that each visitor is served their own arm's order.
@@ -199,9 +200,11 @@ The analysis is `python analysis/report.py --db <db> --experiment exp001_layout`
   page. B may win simply because those targets are easier to reach, not
   because charts invite questions. This test cannot separate the two; it
   answers "which order", not "why".
-- **Screen size.** On a phone the blocks stack, so the swap moves the tiles a
-  long way down in B. Device class is recorded; a per-device cut is
-  exploratory only.
+- **Screen size.** On a phone the filter panel fills the first screen, so A's
+  tiles and B's charts both start at its bottom edge and the two first screens
+  look almost the same ([`variants.md`](variants.md)). The treatment is
+  weaker on mobile. Device class is recorded; a per-device cut is exploratory
+  only.
 - **Novelty effect.** Repeat visitors may react to a layout *change* rather than
   the layout. Not mitigated in this build: the share of returning visitors is
   reported, but there is no first-visit-only cut.
