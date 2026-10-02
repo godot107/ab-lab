@@ -22,8 +22,8 @@ Hiring Lab's public Job Postings Index, deployed to AWS EC2. See README.md for t
 - The app loads data once at startup: restart after code or data changes (or use `--dev`).
 - pandas >= 3.0.6 (3.0.4 segfaults with numpy 2.4). Dash 4: dropdowns need `options` at load or the
   value is cleared to None.
-- Deploy: `deploy/0*.sh` (EC2 via CloudFormation, Caddy HTTPS). Lint before pushing:
-  `cfn-lint infra/ec2.yaml` and ShellCheck (`docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P deploy deploy/*.sh app/entrypoint.sh`).
+- Deploy is ab-lab's, at the repo root (`deploy/up.sh`, `infra/ec2.yaml`, root `compose.yaml`);
+  this folder has no deploy files of its own.
 - **Experiments (ablab).** Off unless `AB_EXPERIMENT` is set (then `AB_SALT` is required and never
   changes mid-test). Exposure = the `/_dash-layout` fetch, which recomputes the arm from the
   cookie, and picks `LAYOUTS[arm]` (exp001: arm B puts the chart grid above the KPI tiles; nothing

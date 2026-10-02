@@ -1,11 +1,12 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  AB-Lab proof-of-concept on EC2: one instance running the Flask app + Caddy
-  via Docker Compose, with automatic Let's Encrypt HTTPS when a domain is given.
+  AB-Lab proof-of-concept on EC2: one instance running the Hiring Demand
+  Monitor (Dash, with the ablab experiment layer) + Caddy via Docker Compose,
+  with automatic Let's Encrypt HTTPS when a domain is given.
 
   Built to be brought up before a demo and deleted after it (deploy/up.sh,
-  deploy/down.sh). No SSH: access is SSM Session Manager, code arrives through
-  a private S3 bucket, and the Anthropic key lives in SSM Parameter Store.
+  deploy/down.sh). No SSH: access is SSM Session Manager and code arrives
+  through a private S3 bucket.
 
   Single instance on purpose. The event store is SQLite on the instance's disk,
   so a second instance behind a load balancer would split one visitor's
@@ -91,22 +92,13 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       Policies:
-        - PolicyName: artifacts-and-secret
+        - PolicyName: artifacts
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action: [s3:GetObject, s3:PutObject]
                 Resource: !Sub "${ArtifactBucket.Arn}/*"
-              - Effect: Allow
-                Action: ssm:GetParameter
-                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/*"
-              - Effect: Allow
-                Action: kms:Decrypt
-                Resource: "*"
-                Condition:
-                  StringEquals:
-                    kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -209,14 +201,6 @@ Resources:
               rsync -a --delete --exclude .env "$tmp/src/" "$APP_DIR/"
               rm -rf "$tmp"
 
-              # Refresh the chat key from Parameter Store on every deploy; an
-              # absent parameter means chat stays off.
-              sed -i '/^ANTHROPIC_API_KEY=/d' "$APP_DIR/.env"
-              if key=$(/snap/bin/aws ssm get-parameter --name "/${AWS::StackName}/anthropic-api-key" \
-                         --with-decryption --query Parameter.Value --output text 2>/dev/null); then
-                echo "ANTHROPIC_API_KEY=$key" >> "$APP_DIR/.env"
-              fi
-
               cd "$APP_DIR" && docker compose up -d --build
               docker compose ps
               DEPLOY
@@ -226,7 +210,7 @@ Resources:
               cat > /usr/local/sbin/ab-export.sh <<'EXPORT'
               #!/bin/bash
               set -euo pipefail
-              src=/var/lib/docker/volumes/ab-lab_events/_data/events.db
+              src=/var/lib/docker/volumes/ab-lab_data/_data/events.db
               [ -f "$src" ] || { echo "no events.db yet"; exit 1; }
               sqlite3 "$src" ".backup /tmp/events-export.db"
               /snap/bin/aws s3 cp /tmp/events-export.db "s3://${ArtifactBucket}/events.db"
@@ -237,7 +221,7 @@ Resources:
               # Bring the app back after a reboot.
               cat > /etc/systemd/system/ab-lab.service <<'UNIT'
               [Unit]
-              Description=ab-lab (Flask + Caddy via Docker Compose)
+              Description=ab-lab (Hiring Demand Monitor + Caddy via Docker Compose)
               Requires=docker.service
               After=docker.service network-online.target
               ConditionPathExists=/opt/ab-lab/compose.yaml
@@ -252,8 +236,39 @@ Resources:
               [Install]
               WantedBy=multi-user.target
               UNIT
+              # Daily data refresh, but never during an experiment: the data is
+              # something both arms hold constant. With AB_EXPERIMENT set in
+              # .env this is a no-op and the app is not restarted (a restart
+              # would drop page loads mid-test). build_hiringlab.py enforces
+              # the same rule from inside the container.
+              cat > /etc/systemd/system/ab-lab-refresh.service <<'UNIT'
+              [Unit]
+              Description=ab-lab: refresh Indeed Hiring Lab data unless an experiment is live
+              Requires=ab-lab.service
+              After=ab-lab.service
+
+              [Service]
+              Type=oneshot
+              WorkingDirectory=/opt/ab-lab
+              ExecStart=/bin/sh -c 'grep -q "^AB_EXPERIMENT=." .env && { echo "experiment live: data frozen"; exit 0; }; docker compose exec -T web python build_hiringlab.py --refresh && docker compose restart web'
+              UNIT
+
+              cat > /etc/systemd/system/ab-lab-refresh.timer <<'UNIT'
+              [Unit]
+              Description=ab-lab: daily data refresh
+
+              [Timer]
+              OnCalendar=*-*-* 13:00:00 UTC
+              Persistent=true
+              RandomizedDelaySec=900
+
+              [Install]
+              WantedBy=timers.target
+              UNIT
+
               systemctl daemon-reload
               systemctl enable ab-lab.service
+              systemctl enable --now ab-lab-refresh.timer
 
               touch /var/lib/bootstrap-complete
             - SiteAddress: !If [HasDomain, !Ref DomainName, ":80"]

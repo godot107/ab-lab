@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# Bring the POC up on EC2, or redeploy the current code to a running stack.
+# Bring the POC (the Hiring Demand Monitor with the ablab experiment layer) up
+# on EC2, or redeploy the current code to a running stack.
 #
 #   deploy/up.sh                                  # plain HTTP on the public IP
 #   AB_DOMAIN=ab.example.com ADMIN_EMAIL=me@example.com deploy/up.sh
 #   AB_EXPERIMENT=exp001_layout deploy/up.sh      # the real, pre-registered run
-#
-# Optional: ANTHROPIC_API_KEY in your shell turns the chat box on. It goes to
-# SSM Parameter Store as a SecureString -- never into the template or UserData,
-# both of which are readable in the AWS console.
 #
 # Needs: AWS CLI v2 with credentials, a default VPC in the region.
 set -euo pipefail
@@ -33,12 +30,6 @@ aws cloudformation deploy \
 BUCKET=$(out ArtifactBucket)
 INSTANCE=$(out InstanceId)
 
-if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  echo "==> Storing chat key in Parameter Store"
-  aws ssm put-parameter --name "/$STACK/anthropic-api-key" --type SecureString \
-    --value "$ANTHROPIC_API_KEY" --overwrite >/dev/null
-fi
-
 echo "==> Uploading release"
 # Everything git would track (committed or not), minus what .gitignore
 # excludes: no .env, no events.db, no venv.
@@ -57,7 +48,7 @@ for _ in $(seq 60); do
 done
 [ "$state" = "Online" ] || { echo "instance never came online in SSM" >&2; exit 1; }
 
-echo "==> Deploying (first run waits for bootstrap, then builds the image)"
+echo "==> Deploying (first run waits for bootstrap, builds the image, downloads the data)"
 cmd=$(aws ssm send-command --instance-ids "$INSTANCE" \
   --document-name AWS-RunShellScript \
   --parameters 'commands=["/usr/local/sbin/ab-deploy.sh"],executionTimeout=["1500"]' \

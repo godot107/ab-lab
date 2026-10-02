@@ -11,7 +11,7 @@ while the outcome is still unknown, so the analysis can't be reverse-engineered
 from the result. Amendments go in a dated appendix, never as an edit.
 
 *Revision note, written before any traffic:* an earlier draft of exp001 ran on
-the small Flask dashboard in `app/` and measured opening a by-sector
+the small Flask dashboard in `app/` (since retired) and measured opening a by-sector
 breakdown. With no traffic collected, it was rewritten for the Hiring Demand
 Monitor (`monitor/`), which is the product. A colour-encoding treatment was
 also considered and rejected: at default settings almost every one-year move

@@ -6,12 +6,12 @@ One EC2 instance, created and deleted by CloudFormation (`infra/ec2.yaml`):
 
 | Resource | Why |
 |---|---|
-| `t4g.small` (Graviton, 2 GB), Ubuntu 24.04 | Runs Docker Compose: Caddy (TLS) + the Flask app. 2 GB builds the image without swapping. |
+| `t4g.small` (Graviton, 2 GB), Ubuntu 24.04 | Runs Docker Compose: Caddy (TLS) + the Hiring Demand Monitor (Dash, with `ablab`). 2 GB builds the image and holds the data (~220 MB per worker) without swapping. |
 | Launch template, IMDSv2 required | Hardens instance metadata; also the exact thing an Auto Scaling group would reuse. |
 | Security group: 80, 443 (TCP + UDP) | No port 22. Shell access is SSM Session Manager. |
-| IAM role | SSM core + read/write on its own artifact bucket + read its own `/<stack>/*` parameters. |
+| IAM role | SSM core + read/write on its own artifact bucket. |
 | Private S3 bucket | Carries the release in and `events.db` out. Encrypted, public access blocked, objects expire in 14 days. |
-| SSM Parameter Store SecureString (created by `up.sh`, not the stack) | The Anthropic key, if you set one. Kept out of the template and UserData, which the AWS console shows in plain text. |
+| systemd timer, daily | Refreshes the Hiring Lab data and restarts the app, **except while `AB_EXPERIMENT` is set**: then it does nothing, because the data is something both arms hold constant. |
 
 No Elastic IP: the stack lives for one demo, so the auto-assigned public IPv4
 is stable for its whole life. Requires a default VPC in the region.
@@ -21,12 +21,13 @@ is stable for its whole life. Requires a default VPC in the region.
 ```bash
 deploy/up.sh                                      # plain HTTP on the public IP
 AB_DOMAIN=ab.example.com ADMIN_EMAIL=me@example.com deploy/up.sh   # HTTPS
-ANTHROPIC_API_KEY=sk-ant-... deploy/up.sh         # also turns the chat box on
 ```
 
 `up.sh` creates or updates the stack, uploads the working tree (everything
 `.gitignore` doesn't exclude) to S3, and runs the deploy on the instance
-through SSM. Rerun it to ship code changes. With a domain, set the printed A
+through SSM. The first start downloads the Hiring Lab data (~12 MB) into the
+data volume; that copy is what the experiment freezes. Rerun it to ship code
+changes. With a domain, set the printed A
 record; Caddy retries until DNS resolves, then gets its certificate.
 
 ```bash
@@ -34,7 +35,7 @@ deploy/down.sh
 ```
 
 `down.sh` exports `events.db` to `data/events-<stack>-<timestamp>.db`, empties
-the bucket, deletes the stack and the key parameter. **Delete, don't stop**: a
+the bucket and deletes the stack. **Delete, don't stop**: a
 stopped instance still bills its EBS volume, and it's easy to forget.
 
 Changing `infra/ec2.yaml` itself (not the app) can make CloudFormation replace
@@ -115,8 +116,8 @@ have both.
 
 ## Getting at `events.db`
 
-It lives in the `ab-lab_events` Docker volume on the instance:
-`/var/lib/docker/volumes/ab-lab_events/_data/events.db`.
+It lives in the `ab-lab_data` Docker volume on the instance, next to the
+Hiring Lab data: `/var/lib/docker/volumes/ab-lab_data/_data/events.db`.
 
 **Download a copy any time** (consistent snapshot of the live db; the app
 keeps running):
@@ -138,7 +139,7 @@ python analysis/report.py --db data/events-snapshot.db --experiment exp001_demo
 
 ```bash
 aws ssm start-session --target $ID            # needs the Session Manager plugin
-sudo sqlite3 /var/lib/docker/volumes/ab-lab_events/_data/events.db \
+sudo sqlite3 /var/lib/docker/volumes/ab-lab_data/_data/events.db \
   "SELECT variant, event, COUNT(*) FROM events GROUP BY 1, 2;"
 ```
 
@@ -157,7 +158,6 @@ Approximate us-east-1 on-demand rates; check current pricing.
 | Public IPv4 | $0.005 | ~$0.36 |
 | 16 GB gp3 | ~$0.002 | ~$0.13 |
 | S3, SSM, data transfer at demo scale | ~0 | ~0 |
-| Chat (optional) | per question, ~$0.02 max | capped by `CHAT_DAILY_LIMIT` (default 100/day) |
 
 A few dollars total, and zero once `down.sh` has run.
 
@@ -174,12 +174,12 @@ The event store is SQLite on the instance's disk. That is the right size for
 this project and the reason it doesn't sit behind a load balancer: with two
 instances, one visitor's exposure and their clicks could be written to
 different databases, and SRM and every rate metric would be computed on split
-data. The chat quotas would stop being shared, too.
+data.
 
 Scaling out is a known sequence, none of which is needed here:
 
-1. **Shared store first.** Move `store.py` and the chat quota table to RDS
-   Postgres (or DynamoDB). Assignment is already stateless -- a hash of the
+1. **Shared store first.** Move `ablab/store.py` to RDS Postgres (or
+   DynamoDB). Assignment is already stateless -- a hash of the
    cookie -- so any instance buckets a visitor the same way.
 2. **ALB + ACM** in front, replacing Caddy for TLS. No sticky sessions needed,
    for the same reason.

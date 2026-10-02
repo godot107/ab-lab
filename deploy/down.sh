@@ -46,7 +46,6 @@ aws s3 rm "s3://$BUCKET" --recursive --only-show-errors
 echo "==> Deleting stack $STACK"
 aws cloudformation delete-stack --stack-name "$STACK"
 aws cloudformation wait stack-delete-complete --stack-name "$STACK"
-aws ssm delete-parameter --name "/$STACK/anthropic-api-key" 2>/dev/null || true
 
 echo "Done. Nothing billable is left from this stack."
 if [ -f "$dest" ]; then

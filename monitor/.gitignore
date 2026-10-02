@@ -3,10 +3,6 @@
 app/var/
 *.db
 
-# Deploy secrets and local config (copy deploy/config.env.example)
-deploy/config.env
-.env
-Caddyfile
 
 # Python / tooling
 __pycache__/

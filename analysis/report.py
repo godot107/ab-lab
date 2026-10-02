@@ -22,7 +22,7 @@ def main() -> int:
     ap.add_argument("--db", default="data/events.db")
     ap.add_argument("--experiment", default="exp001_layout")
     ap.add_argument("--conversion", default="drill_through",
-                    help="the pre-registered primary event (detail_click for the legacy app/ demo)")
+                    help="the pre-registered primary event")
     args = ap.parse_args()
 
     from ablab import store

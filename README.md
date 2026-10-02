@@ -19,8 +19,8 @@ The dashboard under test is [`monitor/`](monitor/), the **Hiring Demand
 Monitor**: a Dash dashboard and data-quality suite with its own
 [README](monitor/README.md). The experimentation layer is the `ablab` package
 (assignment, exposure logging, the collector), which mounts on the monitor's
-server. `app/` is the original, smaller Flask demo the method was first built
-on; it still runs and its tests still pass, but exp001 no longer targets it.
+server. (The method was first built on a smaller Flask demo, retired once
+exp001 moved to the monitor; it's in git history.)
 
 ## What it tests
 
@@ -46,18 +46,18 @@ Full pre-registration: [`docs/experiment_design.md`](docs/experiment_design.md).
 ## Run it
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r app/requirements-dev.txt -r analysis/requirements.txt -e .
-cd app && source ../.venv/bin/activate
-AB_DB_PATH=/tmp/ab.db COOKIE_SECURE=0 python app.py    # http://localhost:5000
-python -m pytest -q                                     # 27 tests
-cd .. && python -m pytest -q analysis/ ablab/           # 5 brief + 6 extension tests
+python3 -m venv .venv && .venv/bin/pip install -r monitor/requirements-dev.txt -r analysis/requirements.txt -e .
+source .venv/bin/activate
+python -m pytest -q ablab/ analysis/                    # 6 extension + 5 brief tests
 
-# the monitor, with an experiment on (DATA_DIR defaults to monitor/app/var)
-cd monitor && python app/build_hiringlab.py --refresh   # first time only
+cd monitor && python -m pytest -q                       # 37 tests
+python app/build_hiringlab.py --refresh                 # download the data, first time only
 AB_EXPERIMENT=exp001_demo AB_SALT=localdemo COOKIE_SECURE=0 AB_DB_PATH=/tmp/m.db \
-  python app/hiringlab_app.py                           # http://localhost:8050
-python -m pytest -q                                     # 36 tests
+  python app/hiringlab_app.py                           # http://localhost:8050, experiment on
 ```
+
+Without `AB_EXPERIMENT` the monitor runs as a plain dashboard and logs nothing.
+Both layouts, on desktop and mobile: [`docs/variants.md`](docs/variants.md).
 
 Analysis, once the stopping rule is met:
 
@@ -69,7 +69,8 @@ python analysis/simulate.py                       # method vs. known ground trut
 
 ## How assignment works
 
-`variant = hash(visitor_id + salt) % 100 < 50 ? A : B`, computed in the app.
+`variant = hash(visitor_id + salt) % 100 < 50 ? A : B`, computed on the
+server (`ablab/assignment.py`) when the page's layout is fetched.
 
 Deterministic, so the same visitor gets the same layout forever without an
 assignment table, and so assignment can be recomputed during analysis to audit
@@ -139,7 +140,7 @@ from synthetic traffic with a known effect.
 ## Privacy
 
 One first-party cookie holding a random UUID — required for sticky assignment,
-and stated plainly on the page rather than claiming a "cookieless" design it
+and stated plainly at the foot of the page while an experiment runs, rather than claiming a "cookieless" design it
 doesn't have. No PII, no IP at rest, no third-party scripts, no session replay.
 Do Not Track and Global Privacy Control are honored: no cookie, no events,
 control layout served. Reasoning in
@@ -150,9 +151,10 @@ and says why this one is hand-rolled.
 ## Deploy (EC2 proof of concept)
 
 One EC2 instance (`t4g.small`) running Docker Compose: Caddy for automatic
-HTTPS, the Flask app, SQLite on a Docker volume. CloudFormation in
+HTTPS, the monitor with `ablab`, SQLite on a Docker volume. CloudFormation in
 `infra/ec2.yaml`; no SSH (SSM Session Manager), code shipped via a private S3
-bucket, the Anthropic key in Parameter Store. Up for a demo, deleted after.
+bucket, a daily data-refresh timer that stands down while an experiment runs.
+Up for a demo, deleted after.
 
 ```bash
 deploy/up.sh                    # create/update the stack and deploy; prints the URL
@@ -177,12 +179,10 @@ cloudburn scan infra --config .cloudburn.yml
 ## Layout
 
 ```
+monitor/      Hiring Demand Monitor — Dash dashboard, data-quality suite, SQL; the product under test, 37 tests
 ablab/        installable package — assignment, event store, Flask extension (collector, cookie, stats); mounts on any Flask or Dash app
-app/          Flask app — both layouts and chat endpoint on top of ablab, 27 tests
 analysis/     stats.py (z-test, CI, SRM, power) · report.py · brief.py · simulate.py · synthetic_traffic.py
-infra/        CloudFormation: EC2 instance, launch template, SG, IAM role, S3 bucket
+infra/        CloudFormation: EC2 instance, launch template, SG, IAM role, S3 bucket, refresh timer
 deploy/       up.sh · down.sh
-data/         build_snapshot.py — freezes the Hiring Lab + BLS JOLTS snapshot
-docs/         experiment_design.md · telemetry_options.md · hosting.md
-monitor/      Hiring Demand Monitor — Dash dashboard, data-quality suite, SQL, 27 tests, own deploy
+docs/         experiment_design.md · variants.md · sample_brief.md · telemetry_options.md · hosting.md
 ```

@@ -24,8 +24,10 @@ came from, and the data is checked before anything renders.
   severity, a control chart, and a fault simulator that proves each check catches what it claims to.
 - **Connected to the business.** Recruit Holdings defines US ARPJ (revenue per job posting) with this
   index as the denominator, and the earnings panel reconciles the two quarter by quarter.
-- **Engineered like production:** 27 tests (including SQL-vs-pandas reconciliation), CI, a Docker
+- **Engineered like production:** 37 tests (including SQL-vs-pandas reconciliation), CI, a Docker
   image, and a one-command EC2 deploy with automatic HTTPS and a daily data refresh.
+- **A/B tested.** The page's layout is under a pre-registered experiment run by the `ablab`
+  package; see the [ab-lab README](../README.md).
 
 ---
 
@@ -69,7 +71,7 @@ pip install -r requirements-dev.txt
 
 python app/build_hiringlab.py --refresh    # download Hiring Lab data → app/var/hiringlab.db
 python app/hiringlab_app.py                # http://127.0.0.1:8050   (add --dev for hot reload)
-python -m pytest                           # 27 tests, synthetic data, no network
+python -m pytest                           # 37 tests, synthetic data, no network
 
 python app/hiringlab_dashboard.py          # optional: static single-file HTML → app/var/
 python app/dq_checks.py --fault spike      # run the checks against a planted fault
@@ -78,8 +80,8 @@ python app/dq_checks.py --fault spike      # run the checks against a planted fa
 Or with Docker (the container downloads the data on first start):
 
 ```bash
-docker build -t hiring-monitor-web app
-docker run -p 8050:8050 -v hm_data:/data hiring-monitor-web
+docker build --build-context ablab=../ablab -t ab-lab-monitor app
+docker run -p 8050:8050 -v hm_data:/data ab-lab-monitor
 ```
 
 > **pandas 3.0.4** segfaults on datetime filtering with numpy 2.4. Use 3.0.6 or later.
@@ -130,10 +132,11 @@ flowchart LR
 
 **Refresh.** Locally, re-run `build_hiringlab.py --refresh` and restart the app. In production, a
 systemd timer runs the same command inside the `web` container at 13:00 UTC daily, then restarts
-it. If the timer ever stops, the Freshness check turns the dashboard badge red.
+it, except while an experiment is live. If the timer ever stops, the Freshness check turns the
+dashboard badge red (during an experiment it reports the data as frozen instead).
 
 **Production path.** Browser → Caddy (automatic HTTPS, ports 80/443) → gunicorn `web` container
-(port 8050) on EC2. `DATA_DIR` is the `hm_data` Docker volume, so the data and check history survive
+(port 8050) on EC2. `DATA_DIR` is the `data` Docker volume, so the data and check history survive
 image rebuilds. On an empty volume, `entrypoint.sh` downloads the data on first start.
 
 ## Repository layout
@@ -148,9 +151,9 @@ image rebuilds. On an empty volume, `entrypoint.sh` downloads the data on first 
 | `app/build_hiringlab.py` | Downloads the Hiring Lab CSVs and loads SQLite |
 | `sql/` | The core metrics in SQL (sector change, fiscal-quarter YoY, grain check) |
 | `tests/` | pytest suite on synthetic data, including SQL-vs-pandas parity |
-| `infra/ec2.yaml` | CloudFormation: EC2 (arm64), security group, Elastic IP, bootstrap |
-| `deploy/` | Numbered deploy scripts: key pair → stack → push → verify → teardown |
-| `compose.yaml` | Production stack: `web` (gunicorn) + `caddy` (automatic HTTPS) |
+| `tests/test_experiment.py` | The A/B wiring: one exposure per visitor, arms differ only in order, frozen data |
+
+Deploy files (`compose.yaml`, `Caddyfile`, `infra/`, `deploy/`) live at the ab-lab repo root.
 
 ---
 
@@ -204,13 +207,15 @@ image rebuilds. On an empty volume, `entrypoint.sh` downloads the data on first 
 
 ## Testing
 
-`python -m pytest` runs 27 tests on a synthetic dataset with the production schema. No network needed:
+`python -m pytest` runs 37 tests on a synthetic dataset with the production schema. No network needed:
 
 - **Every planted fault is caught by its intended check,** and clean data passes.
 - **Pydantic reports the exact row and field** of each bad value.
 - **The index math:** growth doesn't depend on the base, and revenue = postings × ARPJ matches Recruit.
 - **SQL and pandas agree** to floating-point precision (`sql/` vs the app's metrics).
 - **A smoke test** starts the app and hits `/` and `/healthz`.
+- **The experiment wiring:** exposure on the layout fetch, sticky arms, server-side drill
+  tracking, and no data refresh while an experiment is live.
 
 CI runs the tests, `cfn-lint`, ShellCheck and a Docker build on every push.
 
@@ -218,36 +223,22 @@ CI runs the tests, `cfn-lint`, ShellCheck and a Docker build on every push.
 
 ## Deploy to AWS EC2
 
-The same pattern as a Flask app I've deployed before: Docker Compose with gunicorn and Caddy
-(automatic Let's Encrypt HTTPS), infrastructure in CloudFormation, and scripts that verify the live
-site.
+The monitor deploys with the rest of ab-lab, from the repo root: one EC2
+instance running Docker Compose with gunicorn and Caddy (automatic Let's
+Encrypt HTTPS), infrastructure in CloudFormation, no SSH (SSM Session Manager),
+and code shipped through a private S3 bucket.
 
 ```bash
-cp deploy/config.env.example deploy/config.env   # domain, email, region, your IP for SSH
-./deploy/01_keypair.sh      # EC2 key pair → ~/.ssh
-./deploy/02_stack.sh        # CloudFormation: instance + Elastic IP; prints the DNS record to add
-# add the A record (the script prints the Lightsail DNS command), wait for it to resolve
-./deploy/03_push_app.sh     # rsync the app, build, start (first start downloads the data)
-./deploy/04_verify.sh       # DNS, HTTPS redirect, certificate, /healthz, data freshness, refresh timer
-./deploy/99_teardown.sh     # delete everything and prove nothing billable is left
+deploy/up.sh                    # from the repo root; prints the URL
+deploy/down.sh                  # export events.db, then delete everything
 ```
 
-What the instance runs: Ubuntu 24.04 on Graviton (arm64), an encrypted gp3 root volume, IMDSv2 only,
-SSH limited to your IP, a systemd unit for `docker compose up`, and a **daily timer** that refreshes the
-data and restarts the app. `/healthz` reports `data_through` and whether blocking checks pass.
-
-**Approximate cost (us-east-1, 730 h/month)**
-
-| Item | t4g.small (2 GB, recommended) | t4g.micro (1 GB) |
-|---|---|---|
-| Instance ($0.0168 / $0.0084 per hour) | $12.26 | $6.13 |
-| Public IPv4 / Elastic IP ($0.005 per hour) | $3.65 | $3.65 |
-| 20 GB gp3 ($0.08 per GB-month) | $1.60 | $1.60 |
-| **Total** | **≈ $17.51 / month** | **≈ $11.38 / month** |
-
-The app uses ~185 MB of memory in its container, so a t4g.micro works with `WEB_WORKERS=1`. New
-accounts get 750 free hours of public IPv4 a month for 12 months. Prices from AWS's EC2, VPC and EBS
-pricing pages (Sep 2026); check the AWS Pricing Calculator for your region.
+What the instance runs: Ubuntu 24.04 on Graviton (arm64), an encrypted gp3
+root volume, IMDSv2 only, a systemd unit for `docker compose up`, and a **daily
+timer** that refreshes the data and restarts the app. While an A/B experiment
+is live (`AB_EXPERIMENT` set) the timer stands down and the data stays frozen.
+`/healthz` reports `data_through` and whether blocking checks pass. Costs,
+lifecycle and the scale-out path are in [`../docs/hosting.md`](../docs/hosting.md).
 
 ## Limitations
 

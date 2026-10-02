@@ -23,7 +23,7 @@ import sqlite3
 import statistics
 import sys
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,11 +33,9 @@ from analysis.stats import ALPHA, mde, srm_check, two_proportion_test  # noqa: E
 # Pre-registered stopping rule, docs/experiment_design.md section 5.
 TARGET_PER_ARM = 250
 MAX_DAYS = 28
-# Drill-through sources on the monitor; the legacy app/ demo's tile names kept for old dbs.
+# Where a drill-through started (drill_through.target on the monitor).
 TARGET_LABEL = {"rank": "Sector ranking", "trend": "Trend chart", "mult": "Small multiples",
-                "sector-table": "Sector table", "earnings": "Earnings panel",
-                "total": "Tile: all postings", "new": "Tile: new postings",
-                "yoy": "Tile: vs. a year ago", "sectors": "Tile: sectors above 2020"}
+                "sector-table": "Sector table", "earnings": "Earnings panel"}
 
 
 @dataclass
@@ -57,7 +55,6 @@ class Data:
     first_ts: datetime
     last_ts: datetime
     orphans: int                      # clicks with no exposure: should always be 0
-    chat: dict = field(default_factory=dict)
 
     @property
     def days(self) -> float:
@@ -89,19 +86,9 @@ def load(db: Path, experiment: str, conversion: str = "drill_through") -> Data:
             visitors[vid].first_click, visitors[vid].first_target = t, target
         elif event in (conversion, "interaction"):   # any later click counts as exploring
             visitors[vid].interactions += 1
-
-    chat = {}
-    try:
-        q = conn.execute("SELECT COALESCE(SUM(n), 0), COUNT(DISTINCT day) FROM chat_quota"
-                         " WHERE who = '*'").fetchone()
-        askers = conn.execute("SELECT COUNT(DISTINCT who) FROM chat_quota"
-                              " WHERE who NOT IN ('*', 'anon')").fetchone()[0]
-        chat = {"questions": q[0], "days": q[1], "askers": askers}
-    except sqlite3.OperationalError:
-        pass  # chat never enabled on this deployment
     conn.close()
     return Data(visitors, datetime.fromisoformat(rows[0][0]),
-                datetime.fromisoformat(rows[-1][0]), orphans, chat)
+                datetime.fromisoformat(rows[-1][0]), orphans)
 
 
 # --- formatting -------------------------------------------------------------
@@ -234,7 +221,6 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
                 md_table(["Device", "Visitors", "Share"],
                          [list(r) for r in share_table(list(d.visitors.values()),
                                                        lambda v: v.device)]), ""]
-        out += chat_lines(d)
         out += ["## Next step", "",
                 f"Keep collecting. The decision brief is produced once, when both layouts "
                 f"reach {TARGET_PER_ARM} visitors or on day {MAX_DAYS}, whichever comes first.", ""]
@@ -300,7 +286,6 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
                      usage_rows(usage(a), usage(b))), "",
             "First clicks by element:", "",
             md_table(["Element", "Layout A", "Layout B"], first_click_rows(a, b)), ""]
-    out += chat_lines(d)
     out += ["## Recommended next step", "",
             {True: "Roll out layout B, then confirm with a follow-up test that adds the "
                    "page-speed and error guardrails this one lacked.",
@@ -332,21 +317,13 @@ def first_click_rows(a: list[Visitor], b: list[Visitor]) -> list[list[str]]:
              pct(ca[k] / ta) if ta else "n/a", pct(cb[k] / tb) if tb else "n/a"] for k in keys]
 
 
-def chat_lines(d: Data) -> list[str]:
-    if not d.chat or not d.chat["questions"]:
-        return []
-    return ["## Demand for asking questions", "",
-            f"{d.chat['questions']:,} questions over {d.chat['days']} days from "
-            f"{d.chat['askers']:,} visitors, through the \"Ask about this data\" box. "
-            "Questions are not stored, so this shows demand, not topics.", ""]
-
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--db", default="data/events.db")
     ap.add_argument("--experiment", default="exp001_layout")
     ap.add_argument("--conversion", default="drill_through",
-                    help="the pre-registered primary event (detail_click for the legacy app/ demo)")
+                    help="the pre-registered primary event")
     ap.add_argument("--final", action="store_true",
                     help="require the final brief; refuses if the stopping rule isn't met")
     ap.add_argument("--out", type=Path, help="write Markdown here instead of stdout")

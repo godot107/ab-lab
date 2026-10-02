@@ -121,3 +121,9 @@ def test_frozen_data_reads_as_frozen_not_stale(data, monkeypatch):
     monkeypatch.setenv("AB_EXPERIMENT", "exp_t")
     r = q.check_freshness(data, old)
     assert r.passed and "frozen for experiment exp_t" in r.observed and "40 days old" in r.observed
+
+
+def test_cookie_notice_only_while_experimenting(monkeypatch, sqlite_db, tmp_path, live):
+    assert "ab-notice" in json.dumps(live.LAYOUTS["B"], cls=plotly.utils.PlotlyJSONEncoder)
+    off = load_app(monkeypatch, sqlite_db, tmp_path)
+    assert "ab-notice" not in json.dumps(off.LAYOUTS["A"], cls=plotly.utils.PlotlyJSONEncoder)

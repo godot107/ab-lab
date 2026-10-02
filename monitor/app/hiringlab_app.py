@@ -529,6 +529,11 @@ LAYOUT = html.Main([
     html.Div(id="page-about", style={"display": "none"}, children=[
         html.H1("About this dashboard: definitions, methods, and sources"),
         raw(references.about_html())]),
+    # Same text in both arms, and only while an experiment is running.
+    *([html.P("This page is running an A/B test on its own layout. One first-party cookie "
+              "holds a random id so your layout stays consistent; no personal data, no IP, "
+              "no third-party scripts. Honors Do Not Track and Global Privacy Control.",
+              className="hint-click", id="ab-notice")] if EXP else []),
 ])
 
 

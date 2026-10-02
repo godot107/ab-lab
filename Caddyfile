@@ -7,5 +7,5 @@
 
 {$AB_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy web:5000
+	reverse_proxy web:8050
 }
