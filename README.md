@@ -42,6 +42,8 @@ the freshness check reports "frozen" instead of turning the header red.
 Independent project; not affiliated with Indeed.
 
 Full pre-registration: [`docs/experiment_design.md`](docs/experiment_design.md).
+The story of building it, including where it nearly produced wrong answers:
+[`blog.md`](blog.md).
 
 ## Run it
 
