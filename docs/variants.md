@@ -46,7 +46,7 @@ the data. In order:
    Stop: no metric is read.
 2. **The one decision metric: drill-through rate.** The share of exposed
    visitors who opened at least one drill-through (clicked a ranking bar, trend
-   point, small multiple, table row or earnings bar to see the rows behind it).
+   point, small multiple or table row to see the rows behind it).
    It measures whether the page makes people ask a second question.
    - **B is better** if its rate is higher and the difference is significant
      at 5% (the 95% interval for B minus A stays above zero).

@@ -30,3 +30,7 @@ Hiring Lab's public Job Postings Index, deployed to AWS EC2. See README.md for t
   else differs). Drill-throughs are logged server-side in `on_click` as the conversion.
   While an experiment is live, `build_hiringlab.py` refuses to refresh. The image gets `ablab` via a
   compose `additional_contexts` (`ABLAB_DIR`, default `../ablab`).
+- **Earnings panel is off by default** (`SHOW_EARNINGS=1` turns it on): the card relating the index
+  to Recruit Holdings' (Indeed's parent) reported earnings, its drill-through, the About-tab section
+  and footer lines. Kept out of the public page and README on purpose; don't re-advertise it. If it
+  ever comes back, it's a separate experiment (exp002), never a difference between exp001's arms.

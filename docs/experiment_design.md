@@ -27,8 +27,8 @@ who drill through to the rows behind a number.
 
 The surface is the monitor: an interactive dashboard on Indeed Hiring Lab's
 public Job Postings Index (CC BY 4.0) with a computed headline, four KPI tiles,
-a national trend chart, a ranking of 47 occupational sectors, small multiples,
-an earnings panel and a sector table. Almost every mark can be clicked to open
+a national trend chart, a ranking of 47 occupational sectors, small multiples
+and a sector table. Almost every mark can be clicked to open
 a drill-through panel showing the records behind it, with the arithmetic.
 
 **Why it might be true.** KPI tiles answer "what is the number?" completely and
@@ -66,6 +66,9 @@ checks that each visitor is served their own arm's order.
   latest date, top and bottom 10 sectors) and the other tabs.
 - *Interactivity.* Hover, filters and drill-through work identically in both
   arms. The chart library and its bundle are the same.
+- *The earnings-context panel is off in both arms.* It exists behind a flag
+  (`SHOW_EARNINGS`) and stays off for the whole window; turning it on would
+  add drill-through targets mid-test.
 
 ## 3. Randomization
 
@@ -90,8 +93,8 @@ checks that each visitor is served their own arm's order.
   / exposed visitors
 
 A `drill_through` is logged by the server when a click opens the drill-through
-panel, from any source: a ranking bar, a trend point, a small multiple, a
-table row or an earnings bar. The source is stored in `target`.
+panel, from any source: a ranking bar, a trend point, a small multiple or a
+table row. The source is stored in `target`.
 
 **Secondary (context, never the decision):**
 - repeat drill-throughs: share of drilling visitors who drilled more than once
@@ -116,7 +119,7 @@ table row or an earnings bar. The source is stored in `target`.
 below is stated accordingly, and the readout must say so.
 
 **Descriptive usage (context only; reported pooled while the test runs):**
-- first drill source (ranking, trend, small multiples, table, earnings), from
+- first drill source (ranking, trend, small multiples, table), from
   `drill_through.target`
 - returning visitors: share with more than one `pageview`
 - device mix: a coarse `device` class (mobile / tablet / desktop) stored on

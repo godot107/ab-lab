@@ -22,8 +22,6 @@ came from, and the data is checked before anything renders.
 - **Drill-through on every mark,** down to the two records behind a number, with the arithmetic shown.
 - **A data-quality tab** with Pydantic row contracts, dataset checks tagged by quality dimension and
   severity, a control chart, and a fault simulator that proves each check catches what it claims to.
-- **Connected to the business.** Recruit Holdings defines US ARPJ (revenue per job posting) with this
-  index as the denominator, and the earnings panel reconciles the two quarter by quarter.
 - **Engineered like production:** 37 tests (including SQL-vs-pandas reconciliation), CI, a Docker
   image, and a one-command EC2 deploy with automatic HTTPS and a daily data refresh.
 - **A/B tested.** The page's layout is under a pre-registered experiment run by the `ablab`
@@ -39,9 +37,8 @@ came from, and the data is checked before anything renders.
 - **A computed takeaway title,** and KPI tiles where every number has a comparison.
 - **Sector ranking** that's grey unless a move is beyond its ±3σ limit, with each limit drawn as ticks.
 - **Small multiples on a shared scale.** The independent-scale option is labeled, with a warning.
-- **Drill-through:** click a bar, panel, table row, trend point or earnings bar to see the underlying
+- **Drill-through:** click a bar, panel, table row or trend point to see the underlying
   records.
-- **Earnings context:** index YoY by Recruit fiscal quarter next to Recruit's reported figures.
 - Light and dark themes, a phone layout, and CSV export on every table.
 
 ![Drill-through](docs/drill_through.png)
@@ -58,7 +55,7 @@ came from, and the data is checked before anything renders.
 
 ![Data quality](docs/data_quality.png)
 
-**About & references tab:** a glossary, the earnings-link reasoning step by step, methods,
+**About & references tab:** a glossary, methods,
 limitations, and every source link.
 
 ---
@@ -163,25 +160,12 @@ Deploy files (`compose.yaml`, `Caddyfile`, `infra/`, `deploy/`) live at the ab-l
 |---|---|---|
 | Design to one audience and one decision | Purpose line at the top | Knaflic, *Storytelling with Data* ch. 1 |
 | The title is the takeaway | Computed headline | Knaflic (vertical logic) |
-| Every number has a comparison | Baselines, year-ago values, Recruit figures | Tufte's "Compared to what?", via Cairo |
+| Every number has a comparison | Baselines, year-ago values | Tufte's "Compared to what?", via Cairo |
 | Show uncertainty; color only what's unusual | ±3σ bands, grey-unless-beyond ranking | Cairo, *The Truthful Art* ch. 11; Knaflic ch. 4 |
 | Chart chosen by the comparison; one axis | Sorted zero-baseline bars; no dual axis | Knaflic ch. 2; Tufte |
 | Small multiples on a shared scale | Multiples panel + labeled toggle | Tufte, *VDQI* ch. 8 |
 | Overview first, details on demand | Tiles → charts → drill-through | Shneiderman |
 | Document everything / thresholds as controls | Check badge, definitions, DQ tab | Tufte; Sebastian-Coleman, *Measuring Data Quality* |
-
-## Why the earnings link holds
-
-1. **Recruit defines the KPI with this index.** "US ARPJ … is calculated by dividing HR Technology
-   revenue in the US by the total number of US job postings on Indeed. … The denominator … is measured
-   by the Indeed Hiring Lab US Job Postings Index." (Q1 FY2026 call)
-2. **An index's growth equals the count's growth.** With I_t = 100·N_t/N_0, the ratio I_t/I_s = N_t/N_s,
-   because the base cancels. The index gives postings growth exactly, but never the level.
-3. **It's an identity, not a correlation.** Revenue = Postings × ARPJ, so
-   (1 + g_revenue) = (1 + g_postings)(1 + g_ARPJ). Q1 FY2026: 0.96 × 1.35 − 1 = +29.6%, vs +30.0%
-   reported. `tests/test_metrics.py` checks every disclosed quarter.
-4. **The index is not a revenue proxy.** Indeed bills per interaction (per click or per started
-   application), so pricing, clicks and Premium all live in ARPJ, which the index can't see.
 
 ## Method notes
 
@@ -211,7 +195,7 @@ Deploy files (`compose.yaml`, `Caddyfile`, `infra/`, `deploy/`) live at the ab-l
 
 - **Every planted fault is caught by its intended check,** and clean data passes.
 - **Pydantic reports the exact row and field** of each bad value.
-- **The index math:** growth doesn't depend on the base, and revenue = postings × ARPJ matches Recruit.
+- **The index math:** growth doesn't depend on the base.
 - **SQL and pandas agree** to floating-point precision (`sql/` vs the app's metrics).
 - **A smoke test** starts the app and hits `/` and `/healthz`.
 - **The experiment wiring:** exposure on the layout fetch, sticky arms, server-side drill
@@ -254,13 +238,6 @@ lifecycle and the scale-out path are in [`../docs/hosting.md`](../docs/hosting.m
 - **Indeed Hiring Lab Job Postings Index**, [github.com/hiring-lab/job_postings_tracker](https://github.com/hiring-lab/job_postings_tracker),
   licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Source: Indeed Hiring Lab. The CSVs
   aren't committed; `build_hiringlab.py --refresh` downloads them.
-- **Recruit Holdings earnings-call transcripts** (figures in the earnings panel, as stated on each call):
-  [Q2 FY2025](https://recruit-holdings.com/en/ir/library/upload/recruit_202603Q2_call-transcript_en/) ·
-  [Q3 FY2025](https://file.recruit-holdings.com/files/en/Recruit_202603Q3_call-transcript_en.pdf) ·
-  [Q4 FY2025](https://file.recruit-holdings.com/files/en/Recruit_202603Q4_call-transcript_en.pdf) ·
-  [Q1 FY2026](https://file.recruit-holdings.com/files/en/Recruit_202703Q1_call-transcript_en.pdf)
-- **Indeed, [How pricing works on Indeed](https://www.indeed.com/hire/resources/howtohub/how-pricing-works-on-indeed)**
-  (updated Aug 2026).
 
 ## Roadmap
 
@@ -275,7 +252,7 @@ lifecycle and the scale-out path are in [`../docs/hosting.md`](../docs/hosting.m
 
 Designed and written with an AI coding assistant (Claude Code) in the loop, the same way I work day to
 day: I set the questions, the design principles and the checks, and I reviewed and tested what it
-produced. The tests, the data-quality checks and the reconciliation against Recruit's disclosures are
+produced. The tests and the data-quality checks are
 how the numbers are held to account, whoever wrote the code.
 
 ## License

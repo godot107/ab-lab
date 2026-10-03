@@ -155,30 +155,46 @@ def _link(label: str, url: str | None) -> str:
             if url else esc)
 
 
-def references_html() -> str:
+# Shown only with the earnings panel (SHOW_EARNINGS=1 in the app). Everything else on
+# the About tab is about the index itself.
+EARNINGS_ONLY = {"US ARPJ", "Sponsored Jobs pricing", "Recruit fiscal year", "Earnings panel",
+                 "Earnings & monetization (Recruit Holdings, Indeed's parent)"}
+
+
+def _keep(name: str, earnings: bool) -> bool:
+    return earnings or name not in EARNINGS_ONLY
+
+
+def references_html(earnings: bool = False) -> str:
     """References only, as an HTML block (static build footer)."""
     groups = "".join(
         f"<h3>{_html.escape(g)}</h3><ul>" + "".join(f"<li>{_link(l, u)}</li>" for l, u in items) + "</ul>"
-        for g, items in REFERENCES.items())
+        for g, items in REFERENCES.items() if _keep(g, earnings))
     return f'<div class="refs">{groups}<p class="t-note">{_html.escape(DISCLAIMER)}</p></div>'
 
 
-def about_html() -> str:
-    """The full About page as HTML (Dash renders it through dcc.Markdown)."""
-    gl = "".join(f"<dt>{_html.escape(t)}</dt><dd>{_html.escape(d)}</dd>" for t, d in GLOSSARY)
+def about_html(earnings: bool = False) -> str:
+    """The full About page as HTML (Dash renders it through dcc.Markdown). The earnings
+    material appears only with earnings=True."""
+    gl = "".join(f"<dt>{_html.escape(t)}</dt><dd>{_html.escape(d)}</dd>"
+                 for t, d in GLOSSARY if _keep(t, earnings))
     steps = "".join(f"<li><b>{_html.escape(t)}.</b> {_html.escape(d)}</li>" for t, d in EARNINGS_STEPS)
-    meth = "".join(f"<dt>{_html.escape(t)}</dt><dd>{_html.escape(d)}</dd>" for t, d in METHODS)
-    lim = "".join(f"<li>{_html.escape(x)}</li>" for x in LIMITATIONS)
+    meth = "".join(f"<dt>{_html.escape(t)}</dt><dd>{_html.escape(d)}</dd>"
+                   for t, d in METHODS if _keep(t, earnings))
+    lim = "".join(f"<li>{_html.escape(x)}</li>"
+                  for x in (LIMITATIONS if earnings else LIMITATIONS[1:-1]))   # [0], [-1]: ARPJ, Recruit
+    earn_card = (f"""
+  <div class="card"><h2>Why this index connects to Indeed's earnings</h2>
+    <p class="sub">The claim, step by step, with its evidence and its limits.</p><ol class="steps">{steps}</ol></div>"""
+                 if earnings else "")
     return f"""
 <div class="about">
-  <div class="card"><h2>How to read this dashboard</h2><dl class="gloss">{gl}</dl></div>
-  <div class="card"><h2>Why this index connects to Indeed's earnings</h2>
-    <p class="sub">The claim, step by step, with its evidence and its limits.</p><ol class="steps">{steps}</ol></div>
+  <div class="card"><h2>How to read this dashboard</h2><dl class="gloss">{gl}</dl></div>{earn_card}
   <div class="grid about-grid">
     <div class="card"><h2>Methods</h2><dl class="gloss">{meth}</dl></div>
     <div class="card"><h2>Limitations</h2><ul>{lim}</ul></div>
   </div>
-  <div class="card"><h2>References &amp; links</h2>{references_html()}</div>
+  <div class="card"><h2>References &amp; links</h2>{references_html(earnings)}</div>
 </div>"""
 
 

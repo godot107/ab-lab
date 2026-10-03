@@ -29,7 +29,7 @@ from http.cookiejar import CookieJar
 
 # Deliberately not matching the app's bot filter, or nothing would be logged.
 USER_AGENT = "ab-lab-synthetic/1.0 (demo traffic; see analysis/synthetic_traffic.py)"
-TARGETS = ["rank", "trend", "mult", "sector-table", "earnings"]
+TARGETS = ["rank", "trend", "mult", "sector-table"]
 # The first of these ids in the layout JSON says which arm the server picked.
 FIRST_SECTION = re.compile(r'"id":\s*"(tiles|trend)"')
 

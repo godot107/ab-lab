@@ -35,7 +35,7 @@ TARGET_PER_ARM = 250
 MAX_DAYS = 28
 # Where a drill-through started (drill_through.target on the monitor).
 TARGET_LABEL = {"rank": "Sector ranking", "trend": "Trend chart", "mult": "Small multiples",
-                "sector-table": "Sector table", "earnings": "Earnings panel"}
+                "sector-table": "Sector table"}
 
 
 @dataclass

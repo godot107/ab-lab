@@ -24,7 +24,7 @@ def load_app(monkeypatch, sqlite_db, tmp_path, **env):
     monkeypatch.setattr(hd, "DB", sqlite_db)
     monkeypatch.setattr(q, "HISTORY_DB", tmp_path / "dq_history.db")
     monkeypatch.setenv("AB_DB_PATH", str(tmp_path / "events.db"))
-    for k in ("AB_EXPERIMENT", "AB_SALT"):
+    for k in ("AB_EXPERIMENT", "AB_SALT", "SHOW_EARNINGS"):
         monkeypatch.delenv(k, raising=False)
     for k, v in env.items():
         monkeypatch.setenv(k, v)
@@ -90,7 +90,7 @@ def test_drill_through_is_logged_server_side(live, monkeypatch):
     vid = c.get_cookie("ab_vid").value
     monkeypatch.setattr(live, "ctx", SimpleNamespace(triggered_id="rank"))
     with live.server.test_request_context(headers={**UA, "Cookie": f"ab_vid={vid}"}):
-        out = live.on_click({"points": [{"y": "Nursing"}]}, None, None, [], None, None, [])
+        out = live.on_click({"points": [{"y": "Nursing"}]}, None, [], None, None, [])
     assert out[0] == {"kind": "sector", "sector": "Nursing"}
     counts = store.counts("exp_t", conversion="drill_through")
     assert counts[assign(vid, "s1")]["converted"] == 1
@@ -137,3 +137,21 @@ def test_page_time_script_is_served_and_bounded(live):
     post = lambda t: c.post("/api/events", json={"event": "page_time", "target": t},
                             headers=UA).status_code
     assert post("37") == 204 and post("99999") == 400
+
+
+def test_earnings_material_is_off_by_default(monkeypatch, sqlite_db, tmp_path):
+    """Nothing about Recruit's earnings in the page, the About tab or the callbacks."""
+    app = load_app(monkeypatch, sqlite_db, tmp_path)
+    page = json.dumps(app.LAYOUTS["A"], cls=plotly.utils.PlotlyJSONEncoder)
+    for word in ("earnings", "Earnings", "ARPJ", "Recruit's"):
+        assert word not in page, word
+    assert app.CLICK_SOURCES == ["rank", "trend"] and not hasattr(app, "render_earnings")
+
+
+def test_earnings_panel_returns_with_the_flag(monkeypatch, sqlite_db, tmp_path):
+    app = load_app(monkeypatch, sqlite_db, tmp_path, SHOW_EARNINGS="1")
+    page = json.dumps(app.LAYOUTS["A"], cls=plotly.utils.PlotlyJSONEncoder)
+    assert "earnings-card" in page and "Why this index connects to Indeed" in page
+    assert app.CLICK_SOURCES[-1] == "earnings"
+    style, fig, _ = app.render_earnings("total postings", "light")
+    assert style == {} and len(fig.data) > 0

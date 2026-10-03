@@ -338,6 +338,13 @@ app = Dash(__name__, title="Hiring Demand Monitor", suppress_callback_exceptions
 # is logged. While it is on, build_hiringlab.py refuses to refresh the data: the
 # content is something both arms hold constant. Design: ../docs/experiment_design.md
 # ---------------------------------------------------------------------------
+# The panel relating the index to Recruit's (Indeed's parent) reported earnings. Off by
+# default: it's not needed for the experiment, and it stays out of the page entirely
+# (card, drill-through, About-tab section, footer lines) unless SHOW_EARNINGS=1.
+SHOW_EARNINGS = os.environ.get("SHOW_EARNINGS") == "1"
+EARN_NOTE = "Earnings figures are as stated on Recruit's earnings-call transcripts." if SHOW_EARNINGS else ""
+EARN_LINK = "the earnings-link reasoning, " if SHOW_EARNINGS else ""
+
 EXP = None
 if os.environ.get("AB_EXPERIMENT"):
     EXP = Experiment(os.environ["AB_EXPERIMENT"], salt=os.environ["AB_SALT"],
@@ -483,14 +490,14 @@ LAYOUT = html.Main([
         html.Div(id="shared-note", className="hint-click"),
         html.Div(id="multiples", className="multiples"),
     ]),
-    html.Div(id="earnings-card", className="card", children=[
+    *([html.Div(id="earnings-card", className="card", children=[
         html.H2("Why this index matters to Indeed's earnings"),
         html.P(["Recruit's US ARPJ = HR Tech US revenue ÷ total US job postings, and that denominator "
                 "\"is measured by the Indeed Hiring Lab US Job Postings Index.\" · ",
                 html.Span("click a bar to see the daily rows averaged into it", className="hint-click")],
                className="sub"),
         html.Div(className="earn", children=[dcc.Graph(id="earnings", config=GRAPH_CFG), html.Div(id="tree")]),
-    ]),
+    ])] if SHOW_EARNINGS else []),
     html.Div(className="card", children=[
         html.H2("All sectors: table view"),
         html.P(["Sort, filter, or export · ", html.Span("click a row to drill through", className="hint-click")],
@@ -510,7 +517,7 @@ LAYOUT = html.Main([
                 {"if": {"column_id": "titles"}, "color": "var(--muted)"}],
             **TABLE_STYLE),
     ]),
-    raw("""<footer class="card"><h2>Definitions &amp; caveats</h2><ul>
+    raw(f"""<footer class="card"><h2>Definitions &amp; caveats</h2><ul>
       <li><b>Index</b>: seasonally adjusted Indeed job postings, 7-day trailing average, 100 = Feb 1, 2020.</li>
       <li><b>Change</b> = index at the latest date ÷ index N weeks earlier − 1 (the "Compare to" slider).
         "1 year" uses the same calendar date last year. Both points share one base, so it's an exact % change.</li>
@@ -523,13 +530,14 @@ LAYOUT = html.Main([
       <li><b>Base effects</b>: short windows are noisy, long windows carry last year's shocks. Compare two before
         calling a trend.</li>
       <li><b>Postings are demand signals</b>, not hires and not revenue. Public Hiring Lab data, not internal data.
-        Earnings figures are as stated on Recruit's earnings-call transcripts.</li>
-      <li>Full glossary, the earnings-link reasoning, methods, and source links: <b>About &amp; references</b> tab.</li></ul></footer>"""),
+        {EARN_NOTE}</li>
+      <li>Full glossary, {EARN_LINK}methods, and source links:
+        <b>About &amp; references</b> tab.</li></ul></footer>"""),
     ]),                                             # end page-dashboard
     DQ_LAYOUT,
     html.Div(id="page-about", style={"display": "none"}, children=[
         html.H1("About this dashboard: definitions, methods, and sources"),
-        raw(references.about_html())]),
+        raw(references.about_html(earnings=SHOW_EARNINGS))]),
     # Same text in both arms, and only while an experiment is running.
     *([html.P("This page is running an A/B test on its own layout. One first-party cookie "
               "holds a random id so your layout stays consistent; no personal data, no IP, "
@@ -591,7 +599,6 @@ def reset_multiples(variable, stop, _):
     Output("title", "children"), Output("tiles", "children"), Output("window-label", "children"),
     Output("trend", "figure"), Output("rank", "figure"),
     Output("multiples", "children"), Output("shared-note", "children"),
-    Output("earnings-card", "style"), Output("earnings", "figure"), Output("tree", "children"),
     Output("sector-table", "data"),
     Input("series", "value"), Input("weeks", "value"), Input("window", "value"), Input("topn", "value"),
     Input("mult-sectors", "value"), Input("shared", "value"), Input("theme", "data"), Input("drill", "data"))
@@ -616,30 +623,42 @@ def render(variable, stop, window, topn, picks, shared, theme, drill):
     note = ("" if yrange else "⚠ Independent y-scales: each panel stretches to fill its box, so small moves "
             "look as dramatic as big ones. Turn the shared scale back on to compare panels honestly.")
 
-    earn_style = {} if variable == "total postings" else {"display": "none"}
-    if variable == "total postings":
-        em = dict(nat=m["nat"], latest=LATEST)
-        earn_fig, tree = hd.fig_earnings(em, t), raw(hd.earnings_tree(em))
-    else:
-        earn_fig, tree = go.Figure(), ""
-
     return (title(m), tiles(m, start), f"{start:%b %Y} – {end:%b %d, %Y}",
             fig_trend(m, t, start, end), fig_ranking(m, t, topn, selected),
-            panels, note, earn_style, earn_fig, tree, table_rows(m))
+            panels, note, table_rows(m))
+
+
+if SHOW_EARNINGS:
+    @app.callback(
+        Output("earnings-card", "style"), Output("earnings", "figure"), Output("tree", "children"),
+        Input("series", "value"), Input("theme", "data"))
+    def render_earnings(variable, theme):
+        if variable != "total postings":
+            return {"display": "none"}, go.Figure(), ""
+        em = dict(nat=compute(variable, STOPS[-1])["nat"], latest=LATEST)
+        t = hd.THEMES[theme or "light"]
+        return {}, hd.fig_earnings(em, t), raw(hd.earnings_tree(em))
+
+
+CLICK_SOURCES = ["rank", "trend"] + (["earnings"] if SHOW_EARNINGS else [])
 
 
 @app.callback(
     Output("drill", "data"),
-    Output("rank", "clickData"), Output("trend", "clickData"), Output("earnings", "clickData"),
+    *[Output(src, "clickData") for src in CLICK_SOURCES],
     Output({"type": "mult", "index": ALL}, "clickData"), Output("sector-table", "active_cell"),
-    Input("rank", "clickData"), Input("trend", "clickData"), Input("earnings", "clickData"),
+    *[Input(src, "clickData") for src in CLICK_SOURCES],
     Input({"type": "mult", "index": ALL}, "clickData"), Input("sector-table", "active_cell"),
     Input("drill-clear", "n_clicks"),
     State({"type": "mult", "index": ALL}, "id"),
     prevent_initial_call=True)
-def on_click(rank, trend, earn, mults, cell, _clear, mult_ids):
+def on_click(*args):
     """One place that turns any click into a drill target, then clears the click so
-    clicking the same mark again still fires."""
+    clicking the same mark again still fires. Arguments: one clickData per
+    CLICK_SOURCES, then the multiples, the table cell, the close button, the ids."""
+    clicks = dict(zip(CLICK_SOURCES, args))
+    rank, trend, earn = clicks["rank"], clicks["trend"], clicks.get("earnings")
+    mults, cell, _clear, mult_ids = args[len(CLICK_SOURCES):]
     trig = ctx.triggered_id
     target = no_update
     if trig == "drill-clear":
@@ -660,7 +679,7 @@ def on_click(rank, trend, earn, mults, cell, _clear, mult_ids):
         # The conversion, logged when the drill actually opens. The arm comes from the
         # cookie inside track(), never from the click.
         EXP.track("drill_through", "mult" if isinstance(trig, dict) else trig)
-    return target, None, None, None, [None] * len(mult_ids), None
+    return target, *[None] * len(CLICK_SOURCES), [None] * len(mult_ids), None
 
 
 @app.callback(Output("drill-panel", "children"), Output("drill-panel", "style"),
