@@ -1,8 +1,9 @@
 # AB-Lab
 
-> **Draft — work in progress.** Built and tested locally; the EC2 deployment
-> has not been run yet, and no real-traffic results exist. Nothing here reports
-> an experiment outcome.
+> **Draft — work in progress.** Built, tested, and run as a short EC2 demo
+> (mostly synthetic, labelled traffic). The pre-registered 28-day run hasn't
+> happened, so no real-traffic result exists and nothing here reports an
+> experiment outcome.
 
 An A/B test, run end to end, on a US job-postings dashboard built from
 [Indeed Hiring Lab](https://github.com/hiring-lab/job_postings_tracker)'s
@@ -50,9 +51,9 @@ The story of building it, including where it nearly produced wrong answers:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r monitor/requirements-dev.txt -r analysis/requirements.txt -e .
 source .venv/bin/activate
-python -m pytest -q ablab/ analysis/                    # 6 extension + 5 brief tests
+python -m pytest -q ablab/ analysis/                    # 9 ablab + 6 analysis tests
 
-cd monitor && python -m pytest -q                       # 37 tests
+cd monitor && python -m pytest -q                       # 41 tests
 python app/build_hiringlab.py --refresh                 # download the data, first time only
 AB_EXPERIMENT=exp001_demo AB_SALT=localdemo COOKIE_SECURE=0 AB_DB_PATH=/tmp/m.db \
   python app/hiringlab_app.py                           # http://localhost:8050, experiment on
@@ -183,7 +184,7 @@ cloudburn scan infra --config .cloudburn.yml
 ## Layout
 
 ```
-monitor/      Hiring Demand Monitor — Dash dashboard, data-quality suite, SQL; the product under test, 37 tests
+monitor/      Hiring Demand Monitor — Dash dashboard, data-quality suite, SQL; the product under test, 41 tests
 ablab/        installable package — assignment, event store, Flask extension (collector, cookie, stats); mounts on any Flask or Dash app
 analysis/     stats.py (z-test, CI, SRM, power) · report.py · brief.py · simulate.py · synthetic_traffic.py
 infra/        CloudFormation: EC2 instance, launch template, SG, IAM role, S3 bucket, refresh timer

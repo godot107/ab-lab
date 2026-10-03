@@ -6,7 +6,7 @@ One EC2 instance, created and deleted by CloudFormation (`infra/ec2.yaml`):
 
 | Resource | Why |
 |---|---|
-| `t4g.small` (Graviton, 2 GB), Ubuntu 24.04 | Runs Docker Compose: Caddy (TLS) + the Hiring Demand Monitor (Dash, with `ablab`). 2 GB builds the image and holds the data (~220 MB per worker) without swapping. **Standard CPU credits**, not t4g's default unlimited: past the 20%-per-vCPU baseline it slows down instead of billing surplus CPU. |
+| `t4g.small` (Graviton, 2 GB), Ubuntu 24.04 (pinned AMI) | Runs Docker Compose: Caddy (TLS) + the Hiring Demand Monitor (Dash, with `ablab`). 2 GB builds the image and holds the data (~220 MB per worker) without swapping. **Standard CPU credits**, not t4g's default unlimited: past the 20%-per-vCPU baseline it slows down instead of billing surplus CPU. |
 | Launch template, IMDSv2 required | Hardens instance metadata; also the exact thing an Auto Scaling group would reuse. |
 | Security group: 80, 443 (TCP + UDP) | No port 22. Shell access is SSM Session Manager. |
 | IAM role | SSM core + read/write on its own artifact bucket. |
@@ -43,6 +43,55 @@ the instance, which starts a fresh `events.db` and a fresh `AB_SALT`. Run
 `down.sh` first if the data matters. **Changing `AB_DOMAIN` between runs
 counts**: the domain is baked into the instance's UserData, so it forces a
 replacement too, and with it a new public IP. See design considerations below.
+
+### What keeps the instance, and what replaces it
+
+| Action | Instance | Public IP, salt, `events.db` |
+|---|---|---|
+| `up.sh` after a code change (same `AB_DOMAIN`) | kept; the app image is rebuilt and restarted | kept |
+| `up.sh` **without** `AB_DOMAIN`/`ADMIN_EMAIL` on a domain stack | **replaced** (IP-only mode) | new |
+| `up.sh` after editing the launch template or UserData | **replaced** | new |
+| Reboot | kept | kept |
+| Stop, then start | kept | **new IP** (salt and data kept) |
+| `down.sh` then `up.sh` | new | new |
+
+Always pass the same `AB_DOMAIN` and `ADMIN_EMAIL` to every `up.sh`. Before
+any template change on a live stack, preview it:
+
+```bash
+aws cloudformation create-change-set --stack-name ab-lab --change-set-name preview \
+  --template-body file://infra/ec2.yaml --capabilities CAPABILITY_IAM \
+  --parameters ParameterKey=DomainName,UsePreviousValue=true \
+    ParameterKey=AdminEmail,UsePreviousValue=true ParameterKey=ExperimentName,UsePreviousValue=true \
+    ParameterKey=InstanceType,UsePreviousValue=true
+aws cloudformation describe-change-set --stack-name ab-lab --change-set-name preview \
+  --query 'Changes[].ResourceChange.[LogicalResourceId,Action,Replacement]' --output table
+```
+
+`Replacement: True` on `Instance` means a new IP, salt and empty `events.db`.
+Execute it with `aws cloudformation execute-change-set`, or delete it.
+
+Two settings exist to keep ordinary deploys from replacing the instance:
+
+- **The Ubuntu AMI is pinned** (`ImageId`). Resolving "latest" at deploy time
+  meant a new Canonical release would change the launch template and replace
+  the instance during a code deploy. Upgrade the image deliberately, between
+  runs.
+- **CPU credits are `standard`, set on the instance resource.** There it
+  updates in place; in the launch template the same change would replace the
+  instance. Standard credits mean a sustained burst slows the demo down
+  instead of billing surplus CPU (t4g's default is unlimited).
+
+### First-deploy notes
+
+- **Certificate stuck after a DNS change.** If Caddy tried before the A record
+  resolved, it backs off for minutes. Once `dig +short <domain>` shows the new
+  IP, restart it: `cd /opt/ab-lab && docker compose restart caddy` on the instance, or the same
+  through `aws ssm send-command`.
+- **"Site can't be reached" in one browser only.** Chrome caches the old
+  answer: `chrome://net-internals/#dns` → Clear host cache.
+- **A PTR record isn't needed.** Reverse DNS for an AWS IP is AWS's; only the
+  **A** record matters.
 
 ### Pointing a domain at it (Spaceship DNS)
 

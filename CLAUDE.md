@@ -22,8 +22,8 @@ running site.
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r monitor/requirements-dev.txt -r analysis/requirements.txt -e .
 source .venv/bin/activate
-python -m pytest -q ablab analysis                     # 6 + 5 tests
-cd monitor && python -m pytest -q                      # 36 tests
+python -m pytest -q ablab analysis                     # 9 + 6 tests
+cd monitor && python -m pytest -q                      # 41 tests
 python app/build_hiringlab.py --refresh                # data, first time only
 AB_EXPERIMENT=exp001_demo AB_SALT=localdemo COOKIE_SECURE=0 AB_DB_PATH=/tmp/m.db \
   python app/hiringlab_app.py                          # localhost:8050, experiment on
@@ -116,5 +116,10 @@ balancer without splitting a visitor's events across databases. RDS/ALB/ASG
 are the documented scale-out path, deliberately not built. So are an Elastic
 IP and deploy-time domain config: the demo uses the auto-assigned IP and picks
 `AB_DOMAIN` before the first `up.sh`, because changing it later replaces the
-instance (new IP, salt and data). Reasoning,
-costs and how to reach `events.db` in `docs/hosting.md`.
+instance (new IP, salt and data). **Always pass `AB_DOMAIN` and `ADMIN_EMAIL`
+to every `up.sh`**: omitting them switches the stack to IP-only mode, which is
+a replacement too. The Ubuntu AMI is pinned (`ImageId`) and CPU credits are
+`standard` (set on the instance, where it updates in place). Before any change
+to `infra/ec2.yaml` on a live stack, preview a change set and look for
+`Replacement: True`. Reasoning, costs and how to reach `events.db` in
+`docs/hosting.md`.

@@ -22,7 +22,7 @@ came from, and the data is checked before anything renders.
 - **Drill-through on every mark,** down to the two records behind a number, with the arithmetic shown.
 - **A data-quality tab** with Pydantic row contracts, dataset checks tagged by quality dimension and
   severity, a control chart, and a fault simulator that proves each check catches what it claims to.
-- **Engineered like production:** 37 tests (including SQL-vs-pandas reconciliation), CI, a Docker
+- **Engineered like production:** 41 tests (including SQL-vs-pandas reconciliation), CI, a Docker
   image, and a one-command EC2 deploy with automatic HTTPS and a daily data refresh.
 - **A/B tested.** The page's layout is under a pre-registered experiment run by the `ablab`
   package; see the [ab-lab README](../README.md).
@@ -68,7 +68,7 @@ pip install -r requirements-dev.txt
 
 python app/build_hiringlab.py --refresh    # download Hiring Lab data → app/var/hiringlab.db
 python app/hiringlab_app.py                # http://127.0.0.1:8050   (add --dev for hot reload)
-python -m pytest                           # 37 tests, synthetic data, no network
+python -m pytest                           # 41 tests, synthetic data, no network
 
 python app/hiringlab_dashboard.py          # optional: static single-file HTML → app/var/
 python app/dq_checks.py --fault spike      # run the checks against a planted fault
@@ -191,7 +191,7 @@ Deploy files (`compose.yaml`, `Caddyfile`, `infra/`, `deploy/`) live at the ab-l
 
 ## Testing
 
-`python -m pytest` runs 37 tests on a synthetic dataset with the production schema. No network needed:
+`python -m pytest` runs 41 tests on a synthetic dataset with the production schema. No network needed:
 
 - **Every planted fault is caught by its intended check,** and clean data passes.
 - **Pydantic reports the exact row and field** of each bad value.
