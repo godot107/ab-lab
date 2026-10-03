@@ -48,10 +48,13 @@ for _ in $(seq 60); do
 done
 [ "$state" = "Online" ] || { echo "instance never came online in SSM" >&2; exit 1; }
 
+# SSM can register while UserData is still running, before it has written
+# ab-deploy.sh (which then does its own wait for bootstrap-complete). The
+# wait is bounded by executionTimeout.
 echo "==> Deploying (first run waits for bootstrap, builds the image, downloads the data)"
 cmd=$(aws ssm send-command --instance-ids "$INSTANCE" \
   --document-name AWS-RunShellScript \
-  --parameters 'commands=["/usr/local/sbin/ab-deploy.sh"],executionTimeout=["1500"]' \
+  --parameters 'commands=["until [ -x /usr/local/sbin/ab-deploy.sh ]; do sleep 5; done","/usr/local/sbin/ab-deploy.sh"],executionTimeout=["1500"]' \
   --query Command.CommandId --output text)
 while :; do
   status=$(aws ssm get-command-invocation --command-id "$cmd" --instance-id "$INSTANCE" \
