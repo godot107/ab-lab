@@ -544,7 +544,8 @@ LAYOUT = html.Main([
     # Same text in both arms, and only while an experiment is running.
     *([html.P("This page is running an A/B test on its own layout. One first-party cookie "
               "holds a random id so your layout stays consistent; no personal data, no IP, "
-              "no third-party scripts. Honors Do Not Track and Global Privacy Control.",
+              "no third-party scripts, and the server keeps no access log. Honors Do Not Track and "
+              "Global Privacy Control. The anonymous test data is deleted after the write-up.",
               className="hint-click", id="ab-notice")] if EXP else []),
 ])
 
