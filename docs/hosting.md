@@ -119,7 +119,12 @@ have both.
 It lives in the `ab-lab_data` Docker volume on the instance, next to the
 Hiring Lab data: `/var/lib/docker/volumes/ab-lab_data/_data/events.db`.
 
-**Download a copy any time** (consistent snapshot of the live db; the app
+**Check on it any time:** `deploy/stats.sh` copies the live db to
+`data/events-ab-lab-live.db` and prints the status brief (blinded: pooled usage,
+no A-vs-B numbers until the stopping rule is met). `deploy/stats.sh --counts`
+prints just the per-arm counts from `/api/stats`.
+
+**What `stats.sh` does, by hand** (consistent snapshot of the live db; the app
 keeps running):
 
 ```bash

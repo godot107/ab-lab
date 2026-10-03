@@ -158,6 +158,7 @@ Up for a demo, deleted after.
 
 ```bash
 deploy/up.sh                    # create/update the stack and deploy; prints the URL
+deploy/stats.sh                 # live status brief while it runs (blinded; --counts for numbers only)
 python analysis/synthetic_traffic.py --url <site> --visitors 600   # known-truth traffic
 deploy/down.sh                  # export events.db to data/, then delete everything
 python analysis/report.py --db data/events-ab-lab-*.db --experiment exp001_demo
@@ -183,6 +184,6 @@ monitor/      Hiring Demand Monitor — Dash dashboard, data-quality suite, SQL;
 ablab/        installable package — assignment, event store, Flask extension (collector, cookie, stats); mounts on any Flask or Dash app
 analysis/     stats.py (z-test, CI, SRM, power) · report.py · brief.py · simulate.py · synthetic_traffic.py
 infra/        CloudFormation: EC2 instance, launch template, SG, IAM role, S3 bucket, refresh timer
-deploy/       up.sh · down.sh
+deploy/       up.sh · stats.sh · down.sh
 docs/         experiment_design.md · variants.md · sample_brief.md · telemetry_options.md · hosting.md
 ```

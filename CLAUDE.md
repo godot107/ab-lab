@@ -35,7 +35,8 @@ python analysis/report.py --db data/events.db  # the one-time readout
 python analysis/brief.py --db data/events.db   # stakeholder brief (blinded until the rule is met)
 ```
 
-Deploy (EC2 POC): `deploy/up.sh` / `deploy/down.sh` -- see `docs/hosting.md`.
+Deploy (EC2 POC): `deploy/up.sh` / `deploy/stats.sh` (live, blinded status) /
+`deploy/down.sh` -- see `docs/hosting.md`.
 Locally: `cp .env.example .env`, then `docker compose up -d --build`.
 Demo traffic: `python analysis/synthetic_traffic.py --url <site>` (only ever
 against an `exp001_demo` deployment).

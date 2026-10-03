@@ -236,13 +236,13 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
                 "comparison is sealed until the planned sample is reached, then read once.", "",
                 "## Data health", "", *health_lines, "",
                 "## How visitors use the dashboard (both layouts combined)", "",
-                *usage_lines(usage(list(d.visitors.values()))), "",
-                "Where first clicks land:", "",
-                md_table(["Element", "First clicks", "Share"],
-                         [list(r) for r in share_table(list(d.visitors.values()),
-                                                       lambda v: v.first_target,
-                                                       lambda k: TARGET_LABEL.get(k, k))]), "",
-                "Devices:", "",
+                *usage_lines(usage(list(d.visitors.values()))), ""]
+        firsts = share_table(list(d.visitors.values()), lambda v: v.first_target,
+                             lambda k: TARGET_LABEL.get(k, k))
+        out += (["Where first clicks land:", "",
+                 md_table(["Element", "First clicks", "Share"], [list(r) for r in firsts]), ""]
+                if firsts else ["No one has drilled in yet, so there are no first clicks to show.", ""])
+        out += ["Devices:", "",
                 md_table(["Device", "Visitors", "Share"],
                          [list(r) for r in share_table(list(d.visitors.values()),
                                                        lambda v: v.device)]), ""]
