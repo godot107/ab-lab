@@ -1,4 +1,5 @@
 """The Dash app starts on synthetic data and serves the page and /healthz."""
+import functools
 import importlib
 import sys
 
@@ -6,9 +7,12 @@ import dq_checks as q
 import hiringlab_dashboard as hd
 
 
-def test_app_serves_page_and_health(sqlite_db, tmp_path, monkeypatch):
+def test_app_serves_page_and_health(sqlite_db, tmp_path, monkeypatch, today):
     monkeypatch.setattr(hd, "DB", sqlite_db)
     monkeypatch.setattr(q, "HISTORY_DB", tmp_path / "dq_history.db")
+    # Pin "today" to the synthetic data's date: on the wall clock, the Freshness check
+    # starts failing 14 days after the fixture's last row.
+    monkeypatch.setattr(q, "run_checks", functools.partial(q.run_checks, today=today))
     sys.modules.pop("hiringlab_app", None)
     app = importlib.import_module("hiringlab_app")
 

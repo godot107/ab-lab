@@ -55,8 +55,8 @@ the data. In order:
      default. The readout states the smallest lift the sample could have
      detected.
 3. **Supporting numbers, which never decide:** repeat drill-throughs, time to
-   the first drill-through, which chart people drilled from first, returning
-   visitors and device mix. They help explain a result and suggest the next
+   the first drill-through, time on page (median visible seconds), quick exits,
+   which chart people drilled from first, returning visitors and device mix. They help explain a result and suggest the next
    test.
 
 `analysis/report.py` computes steps 1 and 2. `analysis/brief.py` writes them up
@@ -66,13 +66,13 @@ for stakeholders, and shows no A-vs-B numbers until the stopping rule
 ### What this build doesn't measure
 
 "More drill-throughs" is a fair definition of better only if B isn't also worse
-in a way nobody is tracking. Three checks would close that gap, and the design
-records that none of them is built yet:
+in a way nobody is tracking. Three checks would close that gap:
 
-| Guardrail | Why it matters | What it needs |
+| Guardrail | Why it matters | Status |
 |---|---|---|
-| Page load (LCP, 75th percentile) | A layout that wins clicks but loads slower isn't a win | A small browser beacon reporting load timing |
-| JavaScript errors per visitor | A broken page can change click rates either way | The same beacon catching `window.onerror` |
-| Quick exits (left within ~10 s with no interaction) | Charts-first might drive away visitors who only wanted a number | An "engaged" event sent after ~10 s on the page |
+| Quick exits (visible under 10 s, no drill-through) | Charts-first might drive away visitors who only wanted a number | **Measured** from the `page_time` beacon and reported per arm, but not a gate: phones can close a tab without sending it |
+| Page load (LCP, 75th percentile) | A layout that wins clicks but loads slower isn't a win | Not built: needs a beacon reporting load timing |
+| JavaScript errors per visitor | A broken page can change click rates either way | Not built: needs a beacon catching `window.onerror` |
 
-All three must be added **before** real traffic starts, never during the test.
+Anything still missing must be added **before** real traffic starts, never
+during the test.

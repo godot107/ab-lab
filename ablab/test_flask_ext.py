@@ -72,3 +72,18 @@ def test_track_needs_an_exposed_visitor_and_a_known_event(host):
     with c.application.test_request_context(headers={**UA, "Cookie": f"ab_vid={vid}"}):
         assert exp.track("drill_through", "rank") is True
     assert store.counts("exp_host", conversion="drill_through")[assign(vid, "s1")]["converted"] == 1
+
+
+def test_numeric_events_are_bounded(tmp_path, monkeypatch):
+    """A browser-reported number (seconds on page) can't be a string or an outlier."""
+    monkeypatch.setenv("AB_DB_PATH", str(tmp_path / "t.db"))
+    exp = Experiment("exp_num", salt="s1", events=("drill_through", "page_time"),
+                     conversion="drill_through", cookie_secure=False, numeric={"page_time": 3600})
+    app = Flask(__name__)
+    exp.init_app(app)
+    app.add_url_rule("/_layout", "layout", lambda: exp.expose() or "untracked")
+    c = app.test_client()
+    c.get("/_layout", headers=UA)
+    post = lambda t: c.post("/api/events", json={"event": "page_time", "target": t}, headers=UA).status_code
+    assert [post("42"), post("0"), post("3600")] == [204, 204, 204]
+    assert [post("-5"), post("3601"), post("1e9"), post("abc"), post(None)] == [400] * 5

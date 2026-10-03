@@ -59,3 +59,16 @@ def test_synthetic_data_is_labelled(tmp_path):
     db = tmp_path / "e.db"
     make_db(db, 30, 0.3, 0.3, device="synthetic")
     assert "Synthetic demo data" in brief.render(brief.load(db, "exp"), "exp", False)
+
+
+def test_time_on_page_uses_the_median_and_reports_coverage(tmp_path):
+    db = tmp_path / "e.db"
+    make_db(db, 10, 0.0, 0.0)
+    ts = "2026-10-01T12:30:00+00:00"
+    for i, secs in enumerate(["4", "20", "30", "3000"]):            # one idle tab
+        store.record(ts, f"A-{i}", "exp", "A", "page_time", secs, path=db)
+    store.record(ts, "A-1", "exp", "A", "page_time", "10", path=db)  # second visit: summed
+    u = brief.usage(brief.load(db, "exp").arm("A"))
+    assert u["timed_share"] == 0.4                       # 4 of 10 visitors sent timing
+    assert u["median_visible"] == 30.0                   # 4, 30, 30, 3000 -> not the mean
+    assert u["quick_exit"] == 0.25                       # only the 4-second visitor

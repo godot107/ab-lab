@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --from=ablab . ablab/
 COPY *.py entrypoint.sh ./
+COPY assets/ assets/
 
 # /data is a named volume: the downloaded Hiring Lab data and the data-quality history
 # survive container rebuilds. Created here so the volume inherits appuser ownership.

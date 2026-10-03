@@ -52,6 +52,16 @@ class Visitor:
             raise RuntimeError("couldn't tell the layouts apart -- did the section ids change?")
         return "A" if m.group(1) == "tiles" else "B"
 
+    def send_time(self, rng: random.Random, engaged: bool) -> None:
+        """Visible seconds for this page view, as assets/page_time.js would send it.
+        The same rule in both arms (drillers stay longer), so any gap between arms
+        comes only through the drill-through rate, plus noise. About 1 view in 10
+        sends nothing, like a phone killing the tab."""
+        if rng.random() < 0.1:
+            return
+        secs = rng.lognormvariate(4.0 if engaged else 3.2, 0.9)   # medians ~55 s / ~25 s
+        self.send("page_time", str(min(round(secs), 3600)))
+
     def send(self, event: str, target: str) -> None:
         req = urllib.request.Request(
             f"{self.base}/api/events", method="POST",
@@ -65,6 +75,7 @@ def one_visitor(i: int, args, rates: dict[str, float]) -> tuple[str, bool]:
     v = Visitor(args.url)
     arm = v.visit()
     converted = rng.random() < rates[arm]
+    v.send_time(rng, converted)
     if converted:
         v.send("drill_through", rng.choice(TARGETS))
         for _ in range(rng.choice([0, 0, 1, 2])):          # a few repeat drills
@@ -75,6 +86,7 @@ def one_visitor(i: int, args, rates: dict[str, float]) -> tuple[str, bool]:
         again = v.visit()
         if again != arm:
             raise RuntimeError(f"visitor {i} switched arms {arm} -> {again}")
+        v.send_time(rng, False)
     return arm, converted
 
 

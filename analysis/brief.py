@@ -47,6 +47,7 @@ class Visitor:
     first_click: datetime | None = None
     first_target: str | None = None
     interactions: int = 0
+    visible_secs: int | None = None   # sum of page_time events; None = no timing sent
 
 
 @dataclass
@@ -86,6 +87,8 @@ def load(db: Path, experiment: str, conversion: str = "drill_through") -> Data:
             visitors[vid].first_click, visitors[vid].first_target = t, target
         elif event in (conversion, "interaction"):   # any later click counts as exploring
             visitors[vid].interactions += 1
+        elif event == "page_time" and (target or "").isdigit():
+            visitors[vid].visible_secs = (visitors[vid].visible_secs or 0) + int(target)
     conn.close()
     return Data(visitors, datetime.fromisoformat(rows[0][0]),
                 datetime.fromisoformat(rows[-1][0]), orphans)
@@ -131,6 +134,23 @@ def usage(vs: list[Visitor]) -> dict:
         "median_secs": statistics.median(secs) if secs else None,
         "explored": (sum(v.interactions > 0 for v in clicked) / len(clicked)) if clicked else None,
         "returning": sum(v.pageviews > 1 for v in vs) / len(vs) if vs else 0.0,
+        **time_on_page(vs),
+    }
+
+
+QUICK_EXIT_SECS = 10
+
+
+def time_on_page(vs: list[Visitor]) -> dict:
+    """Visible seconds per visitor, from page_time beacons. Phones can close a tab
+    without sending one, so coverage is reported and the median is used, not the
+    mean (a few tabs left open for an hour would drag a mean anywhere)."""
+    timed = [v for v in vs if v.visible_secs is not None]
+    return {
+        "timed_share": len(timed) / len(vs) if vs else 0.0,
+        "median_visible": statistics.median(v.visible_secs for v in timed) if timed else None,
+        "quick_exit": (sum(v.visible_secs < QUICK_EXIT_SECS and not v.first_click for v in timed)
+                       / len(timed)) if timed else None,
     }
 
 
@@ -141,6 +161,11 @@ def usage_lines(u: dict) -> list[str]:
     if u["explored"] is not None:
         lines.append(f"- **Kept exploring:** {pct(u['explored'])} of those who drilled in did it again.")
     lines.append(f"- **Came back:** {pct(u['returning'])} of visitors loaded the page more than once.")
+    if u["median_visible"] is not None:
+        lines.append(f"- **Time on page:** median {u['median_visible']:.0f} seconds visible per visitor "
+                     f"(measured for {pct(u['timed_share'])} of visitors).")
+        lines.append(f"- **Quick exits:** {pct(u['quick_exit'])} left within {QUICK_EXIT_SECS} seconds "
+                     "without drilling in.")
     return lines
 
 
@@ -301,10 +326,15 @@ def usage_rows(ua: dict, ub: dict) -> list[list[str]]:
 
     def maybe(x):
         return "n/a" if x is None else pct(x)
+
+    def vis(u):
+        return "n/a" if u["median_visible"] is None else f"{u['median_visible']:.0f} s"
     return [["Drilled into the data", pct(ua["opened"]), pct(ub["opened"])],
             ["Median time to first click", secs(ua), secs(ub)],
             ["Kept exploring (of those who drilled in)", maybe(ua["explored"]), maybe(ub["explored"])],
-            ["Came back", pct(ua["returning"]), pct(ub["returning"])]]
+            ["Came back", pct(ua["returning"]), pct(ub["returning"])],
+            ["Median time on page (visible)", vis(ua), vis(ub)],
+            [f"Quick exits (< {QUICK_EXIT_SECS} s, no drill)", maybe(ua["quick_exit"]), maybe(ub["quick_exit"])]]
 
 
 def first_click_rows(a: list[Visitor], b: list[Visitor]) -> list[list[str]]:

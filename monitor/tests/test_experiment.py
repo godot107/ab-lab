@@ -127,3 +127,13 @@ def test_cookie_notice_only_while_experimenting(monkeypatch, sqlite_db, tmp_path
     assert "ab-notice" in json.dumps(live.LAYOUTS["B"], cls=plotly.utils.PlotlyJSONEncoder)
     off = load_app(monkeypatch, sqlite_db, tmp_path)
     assert "ab-notice" not in json.dumps(off.LAYOUTS["A"], cls=plotly.utils.PlotlyJSONEncoder)
+
+
+def test_page_time_script_is_served_and_bounded(live):
+    c = live.server.test_client()
+    js = c.get("/assets/page_time.js")
+    assert js.status_code == 200 and b"sendBeacon" in js.data
+    c.get(LAYOUT, headers=UA)
+    post = lambda t: c.post("/api/events", json={"event": "page_time", "target": t},
+                            headers=UA).status_code
+    assert post("37") == 204 and post("99999") == 400

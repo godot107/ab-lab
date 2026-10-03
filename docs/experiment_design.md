@@ -96,15 +96,24 @@ table row or an earnings bar. The source is stored in `target`.
 **Secondary (context, never the decision):**
 - repeat drill-throughs: share of drilling visitors who drilled more than once
 - time from exposure to first drill-through
+- time on page: median visible seconds per visitor, from `page_time` beacons
+  (`monitor/app/assets/page_time.js`). It counts only time the tab is visible,
+  summed across a visitor's page views. Phones can close a tab without sending
+  it, so the share of visitors with any timing is reported next to it, and the
+  median is used, not the mean.
 - ~~filter use~~ — *not instrumented; dropped rather than claimed*
 
 **Guardrails (a win that breaks one of these is not a win):**
 - ~~Largest Contentful Paint, p75~~ and ~~client JS error rate~~ — *not
   instrumented in this build.* Both need a client beacon. Adding them means
   adding them *before* a run's traffic starts, never after.
+- **Quick exits** (visible under 10 seconds, no drill-through), per arm.
+  *Measured, but not a gate in this build:* it rests on a browser beacon
+  with incomplete coverage, so it informs the write-up but cannot veto the
+  decision.
 
-**So this build has no guardrail.** The decision rule below is stated
-accordingly, and the readout must say so.
+**So this build has no guardrail that can stop a ship.** The decision rule
+below is stated accordingly, and the readout must say so.
 
 **Descriptive usage (context only; reported pooled while the test runs):**
 - first drill source (ranking, trend, small multiples, table, earnings), from
@@ -114,7 +123,8 @@ accordingly, and the readout must say so.
   exposure and pageview rows; the user agent itself is never stored
 
 Everything above is derivable from the events table as it stands (`exposure`,
-`pageview`, `drill_through`, with timestamps, targets and device class).
+`pageview`, `drill_through`, `page_time`, with timestamps, targets and device
+class). `page_time` carries whole seconds, which the server bounds to 0-3600.
 Synthetic demo traffic records its device as `synthetic`, so it can never pass
 for real visitors in a readout.
 

@@ -342,7 +342,8 @@ EXP = None
 if os.environ.get("AB_EXPERIMENT"):
     EXP = Experiment(os.environ["AB_EXPERIMENT"], salt=os.environ["AB_SALT"],
                      split=int(os.environ.get("AB_SPLIT", "50")),
-                     events=("drill_through",), conversion="drill_through",
+                     events=("drill_through", "page_time"), conversion="drill_through",
+                     numeric={"page_time": 3600},   # visible seconds, from assets/page_time.js
                      cookie_secure=os.environ.get("COOKIE_SECURE", "1") == "1")
     EXP.init_app(app.server)
 EXTRA_CSS = """

@@ -67,12 +67,16 @@ def now() -> str:
 class Experiment:
     def __init__(self, name: str, salt: str, split: int = 50,
                  events: tuple[str, ...] = ("detail_click", "interaction"),
-                 conversion: str = "detail_click", cookie_secure: bool = True):
+                 conversion: str = "detail_click", cookie_secure: bool = True,
+                 numeric: dict[str, int] | None = None):
+        """`numeric` maps an event to the largest whole number its target may hold,
+        e.g. {"page_time": 3600}: the browser reports the number, so it is bounded."""
         if conversion not in events:
             raise ValueError("the conversion event must be one the collector accepts")
         self.name, self.salt, self.split = name, salt, split
         self.events, self.conversion = events, conversion
         self.cookie_secure = cookie_secure
+        self.numeric = numeric or {}
 
     def tracked(self) -> bool:
         return has_request_context() and not (opted_out() or is_bot())
@@ -146,6 +150,9 @@ class Experiment:
             return jsonify(error="unknown event"), 400
 
         target = (payload.get("target") or "")[:64] or None
+        if event in self.numeric:
+            if not (target or "").isdigit() or int(target) > self.numeric[event]:
+                return jsonify(error=f"{event} needs a whole number 0..{self.numeric[event]}"), 400
         store.record(now(), vid, self.name, assign(vid, self.salt, self.split),
                      event, target)
         return "", 204
