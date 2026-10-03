@@ -145,6 +145,15 @@ once), an endpoint that never shows a p-value, and a stakeholder brief that **re
 compare A and B** until the rule is met. Mid-test, it only reports progress, data health and
 pooled usage.
 
+The live status page follows the same rule. Here it is partway through a demo run, with 202
+visitors, 200 of them synthetic and labelled as such:
+
+![The live experiment status page, mid-test: visitors, pooled drill-through rate, time on page and quick exits, progress to the stopping rule, and a sealed "Which version is ahead?" box.](docs/experiment_page.png)
+
+*The public `/experiment` page mid-test. Everything is pooled across both versions; the one
+question a scoreboard would answer, "which version is ahead?", is deliberately sealed until
+both versions reach 250 visitors or day 28. Anonymous totals only.*
+
 The same simulation caught a bug in my own sample-size formula: a missing factor of 2 that had
 every power calculation understating the traffic needed by half.
 
