@@ -119,6 +119,10 @@ have both.
 It lives in the `ab-lab_data` Docker volume on the instance, next to the
 Hiring Lab data: `/var/lib/docker/volumes/ab-lab_data/_data/events.db`.
 
+**Watch it live:** `<site>/experiment` is a public status page with charts:
+visitors per day, progress to the stopping rule, drill-through sources, time
+on page, devices. Anonymous totals only, and blinded like the brief.
+
 **Check on it any time:** `deploy/stats.sh` copies the live db to
 `data/events-ab-lab-live.db` and prints the status brief (blinded: pooled usage,
 no A-vs-B numbers until the stopping rule is met). `deploy/stats.sh --counts`

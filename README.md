@@ -161,6 +161,7 @@ Up for a demo, deleted after.
 ```bash
 deploy/up.sh                    # create/update the stack and deploy; prints the URL
 deploy/stats.sh                 # live status brief while it runs (blinded; --counts for numbers only)
+open <site>/experiment          # public live status page with charts (anonymous totals, blinded)
 python analysis/synthetic_traffic.py --url <site> --visitors 600   # known-truth traffic
 deploy/down.sh                  # export events.db to data/, then delete everything
 python analysis/report.py --db data/events-ab-lab-*.db --experiment exp001_demo

@@ -87,3 +87,35 @@ def test_numeric_events_are_bounded(tmp_path, monkeypatch):
     post = lambda t: c.post("/api/events", json={"event": "page_time", "target": t}, headers=UA).status_code
     assert [post("42"), post("0"), post("3600")] == [204, 204, 204]
     assert [post("-5"), post("3601"), post("1e9"), post("abc"), post(None)] == [400] * 5
+
+
+def _seed(n_per_arm, drills=0, target="rank"):
+    ts = "2026-10-01T12:00:00+00:00"
+    for arm in "AB":
+        for i in range(n_per_arm):
+            vid = f"{arm}{i}"
+            store.record(ts, vid, "exp_host", arm, "exposure", device="desktop")
+            store.record(ts, vid, "exp_host", arm, "pageview", device="desktop")
+            if i < drills:
+                store.record(ts, vid, "exp_host", arm, "drill_through", target)
+
+
+def test_dashboard_is_blinded_until_the_stopping_rule(host):
+    exp, c = host
+    _seed(5, drills=2)
+    body = c.get("/experiment").get_data(as_text=True)
+    assert "Not shown yet, on purpose" in body and "Result by version" not in body
+    assert "40%" in body                      # pooled drill rate: 4 of 10
+    exp.target_per_arm = 5                    # now the rule is met
+    body = c.get("/experiment").get_data(as_text=True)
+    assert "Result by version" in body and "p-value" not in body.lower()
+
+
+def test_dashboard_escapes_browser_reported_labels_and_logs_nothing(host):
+    _, c = host
+    _seed(1, drills=1, target='<script>alert(1)</script>')
+    r = c.get("/experiment", headers=UA)
+    assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
+    assert "<script>" not in r.get_data(as_text=True)
+    assert "ab_vid" not in r.headers.get("Set-Cookie", "")
+    assert sum(v["exposed"] for v in store.counts("exp_host").values()) == 2   # only the seeded ones

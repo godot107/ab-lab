@@ -251,6 +251,11 @@ data as `report.py`, and `--final` refuses to run before the rule is met.
 Per-layout usage cuts appear only in the final brief, labelled exploratory:
 leads for the next experiment, never part of this decision.
 
+The public status page (`/experiment`) follows the same rule: anonymous
+totals with both layouts pooled until the stopping rule is met, then
+descriptive per-layout rates, never a p-value. It isn't linked from the
+dashboard, so the page under test doesn't change.
+
 ## 9. Scope of the proof-of-concept deployment
 
 The design above is for a full run: 28 days or 250 visitors per arm. The EC2

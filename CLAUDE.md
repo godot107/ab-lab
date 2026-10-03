@@ -59,6 +59,10 @@ changes):
 - **One exposure per visitor is enforced by a partial unique index**, not by
   application code. A double-counted exposure silently corrupts the denominator
   of every rate metric and SRM won't necessarily catch it.
+- **`/experiment` is a public status page, blinded until the stopping rule.**
+  Anonymous totals only (`ablab/dashboard.py`): pooled usage until the smaller
+  arm reaches `target_per_arm` or `max_days` pass, per-arm rates after, never a
+  p-value. Not linked from the dashboard, so the tested page doesn't change.
 - **`/api/stats` returns counts but never a p-value.** Peeking must not be one
   click away; `analysis/simulate.py` shows 28 daily checks turn a 5% false
   positive rate into 28%.

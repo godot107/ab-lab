@@ -155,3 +155,11 @@ def test_earnings_panel_returns_with_the_flag(monkeypatch, sqlite_db, tmp_path):
     assert app.CLICK_SOURCES[-1] == "earnings"
     style, fig, _ = app.render_earnings("total postings", "light")
     assert style == {} and len(fig.data) > 0
+
+
+def test_experiment_page_is_served_and_blinded(live):
+    c = live.server.test_client()
+    c.get(LAYOUT, headers=UA)
+    r = c.get("/experiment")
+    assert r.status_code == 200 and "Charts first or tiles first?" in r.get_data(as_text=True)
+    assert "Not shown yet, on purpose" in r.get_data(as_text=True)

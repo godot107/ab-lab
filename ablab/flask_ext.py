@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, Flask, g, has_request_context, jsonify, request
 
-from ablab import store
+from ablab import dashboard, store
 from ablab.assignment import assign
 
 COOKIE = "ab_vid"
@@ -68,7 +68,8 @@ class Experiment:
     def __init__(self, name: str, salt: str, split: int = 50,
                  events: tuple[str, ...] = ("detail_click", "interaction"),
                  conversion: str = "detail_click", cookie_secure: bool = True,
-                 numeric: dict[str, int] | None = None):
+                 numeric: dict[str, int] | None = None,
+                 target_per_arm: int = 250, max_days: int = 28):
         """`numeric` maps an event to the largest whole number its target may hold,
         e.g. {"page_time": 3600}: the browser reports the number, so it is bounded."""
         if conversion not in events:
@@ -77,6 +78,8 @@ class Experiment:
         self.events, self.conversion = events, conversion
         self.cookie_secure = cookie_secure
         self.numeric = numeric or {}
+        # The pre-registered stopping rule: /experiment stays blinded until it's met.
+        self.target_per_arm, self.max_days = target_per_arm, max_days
 
     def tracked(self) -> bool:
         return has_request_context() and not (opted_out() or is_bot())
@@ -124,6 +127,7 @@ class Experiment:
         bp = Blueprint("ablab", __name__)
         bp.add_url_rule("/api/events", "collect", self._collect, methods=["POST"])
         bp.add_url_rule("/api/stats", "stats", self._stats)
+        bp.add_url_rule("/experiment", "dashboard", self._dashboard)
         app.register_blueprint(bp)
         app.after_request(self._set_cookie)
 
@@ -156,6 +160,13 @@ class Experiment:
         store.record(now(), vid, self.name, assign(vid, self.salt, self.split),
                      event, target)
         return "", 204
+
+    def _dashboard(self):
+        """Public status page: anonymous totals, blinded until the stopping rule.
+        Viewing it logs nothing."""
+        page = dashboard.render(self.name, self.conversion, self.split,
+                                self.target_per_arm, self.max_days)
+        return page, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
     def _stats(self):
         """Live counts. Deliberately NOT a p-value.
