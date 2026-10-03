@@ -278,6 +278,12 @@ Resources:
   Instance:
     Type: AWS::EC2::Instance
     Properties:
+      # Standard credits, not t4g's default "unlimited": past the 20%-per-vCPU
+      # baseline the demo slows down rather than billing surplus CPU. Set here,
+      # not in the launch template, because on the instance it updates in place;
+      # a launch-template change would replace the instance (new IP, salt, data).
+      CreditSpecification:
+        CPUCredits: standard
       LaunchTemplate:
         LaunchTemplateId: !Ref LaunchTemplate
         Version: !GetAtt LaunchTemplate.LatestVersionNumber

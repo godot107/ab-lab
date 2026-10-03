@@ -6,7 +6,7 @@ One EC2 instance, created and deleted by CloudFormation (`infra/ec2.yaml`):
 
 | Resource | Why |
 |---|---|
-| `t4g.small` (Graviton, 2 GB), Ubuntu 24.04 | Runs Docker Compose: Caddy (TLS) + the Hiring Demand Monitor (Dash, with `ablab`). 2 GB builds the image and holds the data (~220 MB per worker) without swapping. |
+| `t4g.small` (Graviton, 2 GB), Ubuntu 24.04 | Runs Docker Compose: Caddy (TLS) + the Hiring Demand Monitor (Dash, with `ablab`). 2 GB builds the image and holds the data (~220 MB per worker) without swapping. **Standard CPU credits**, not t4g's default unlimited: past the 20%-per-vCPU baseline it slows down instead of billing surplus CPU. |
 | Launch template, IMDSv2 required | Hardens instance metadata; also the exact thing an Auto Scaling group would reuse. |
 | Security group: 80, 443 (TCP + UDP) | No port 22. Shell access is SSM Session Manager. |
 | IAM role | SSM core + read/write on its own artifact bucket. |
@@ -163,7 +163,7 @@ Approximate us-east-1 on-demand rates; check current pricing.
 
 | Item | Per hour | 3-day demo |
 |---|---|---|
-| `t4g.small` | ~$0.017 | ~$1.20 |
+| `t4g.small` (standard credits: no surplus-CPU charges) | ~$0.017 | ~$1.20 |
 | Public IPv4 | $0.005 | ~$0.36 |
 | 16 GB gp3 | ~$0.002 | ~$0.13 |
 | S3, SSM, data transfer at demo scale | ~0 | ~0 |
