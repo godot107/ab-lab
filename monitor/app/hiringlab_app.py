@@ -351,6 +351,8 @@ if os.environ.get("AB_EXPERIMENT"):
                      split=int(os.environ.get("AB_SPLIT", "50")),
                      events=("drill_through", "page_time"), conversion="drill_through",
                      numeric={"page_time": 3600},   # visible seconds, from assets/page_time.js
+                     # Pre-registered: 28 days. A short demo sets its own, before traffic.
+                     max_days=int(os.environ.get("AB_MAX_DAYS", "28")),
                      cookie_secure=os.environ.get("COOKIE_SECURE", "1") == "1")
     EXP.init_app(app.server)
 EXTRA_CSS = """

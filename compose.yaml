@@ -12,6 +12,7 @@ services:
       AB_EXPERIMENT: ${AB_EXPERIMENT:-}
       AB_SALT: ${AB_SALT:-}
       AB_SPLIT: ${AB_SPLIT:-50}
+      AB_MAX_DAYS: ${AB_MAX_DAYS:-28}   # stopping rule's time limit; the EC2 demo uses 7
       AB_DB_PATH: /data/events.db
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
     volumes:

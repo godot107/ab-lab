@@ -163,3 +163,10 @@ def test_experiment_page_is_served_and_blinded(live):
     r = c.get("/experiment")
     assert r.status_code == 200 and "Charts first or tiles first?" in r.get_data(as_text=True)
     assert "Not shown yet, on purpose" in r.get_data(as_text=True)
+
+
+def test_demo_stopping_rule_comes_from_the_environment(monkeypatch, sqlite_db, tmp_path):
+    app = load_app(monkeypatch, sqlite_db, tmp_path, AB_EXPERIMENT="exp_t", AB_SALT="s1",
+                   AB_MAX_DAYS="7")
+    rule = app.server.test_client().get("/api/stats").get_json()["stopping_rule"]
+    assert rule == {"target_per_arm": 250, "max_days": 7}

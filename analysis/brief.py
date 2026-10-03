@@ -187,14 +187,15 @@ def health(d: Data) -> tuple[list[str], bool]:
     return lines, ok
 
 
-def render(d: Data, experiment: str, want_final: bool) -> str:
+def render(d: Data, experiment: str, want_final: bool,
+           target: int = TARGET_PER_ARM, max_days: int = MAX_DAYS) -> str:
     a, b = d.arm("A"), d.arm("B")
     smaller = min(len(a), len(b))
-    rule_met = smaller >= TARGET_PER_ARM or d.days >= MAX_DAYS
+    rule_met = smaller >= target or d.days >= max_days
     if want_final and not rule_met:
         raise SystemExit(
-            f"Stopping rule not met ({smaller} of {TARGET_PER_ARM} visitors in the smaller "
-            f"layout, day {d.days:.1f} of {MAX_DAYS}). The final brief waits for it; "
+            f"Stopping rule not met ({smaller} of {target} visitors in the smaller "
+            f"layout, day {d.days:.1f} of {max_days}). The final brief waits for it; "
             f"run without --final for the interim.")
     final = rule_met
 
@@ -220,16 +221,16 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
 
     if not final:
         per_day = smaller / d.days
-        remaining = TARGET_PER_ARM - smaller
-        eta = min(remaining / per_day if per_day else float("inf"), MAX_DAYS - d.days)
+        remaining = target - smaller
+        eta = min(remaining / per_day if per_day else float("inf"), max_days - d.days)
         when = "within a day" if eta < 1 else f"in about {eta:.0f} more days"
         day = max(1, math.ceil(d.days))
         out += ["## Bottom line", "",
                 ("**No decision yet, by design.** " if healthy else
                  "**Data problem: the test is not producing usable data.** ")
-                + f"The test is {pct(smaller / TARGET_PER_ARM)} of the way to its planned "
-                  f"sample ({smaller:,} of {TARGET_PER_ARM:,} visitors per layout, day "
-                  f"{day} of at most {MAX_DAYS}). At the current pace it completes {when}.", "",
+                + f"The test is {pct(smaller / target)} of the way to its planned "
+                  f"sample ({smaller:,} of {target:,} visitors per layout, day "
+                  f"{day} of at most {max_days}). At the current pace it completes {when}.", "",
                 "## Why no A-vs-B numbers yet", "",
                 "Early results swing widely, and acting on the first lead turns a 5% chance "
                 "of a false win into roughly 28% (measured in `analysis/simulate.py`). The "
@@ -248,7 +249,7 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
                                                        lambda v: v.device)]), ""]
         out += ["## Next step", "",
                 f"Keep collecting. The decision brief is produced once, when both layouts "
-                f"reach {TARGET_PER_ARM} visitors or on day {MAX_DAYS}, whichever comes first.", ""]
+                f"reach {target} visitors or on day {max_days}, whichever comes first.", ""]
         return "\n".join(out)
 
     # --- final ---------------------------------------------------------------
@@ -296,7 +297,7 @@ def render(d: Data, experiment: str, want_final: bool) -> str:
                "*not* evidence that the layouts are equivalent."), "",
             "## How far to trust it", "", *health_lines,
             f"- **Sample:** {smaller:,} visitors in the smaller layout against a plan of "
-            f"{TARGET_PER_ARM:,}.",
+            f"{target:,}.",
             "- **Audience:** visitors to a portfolio site, mostly recruiters and peers. The "
             "result describes this audience, not every dashboard user.",
             "- **What it measures:** whether people dig into the data, which is "
@@ -354,12 +355,17 @@ def main() -> None:
     ap.add_argument("--experiment", default="exp001_layout")
     ap.add_argument("--conversion", default="drill_through",
                     help="the pre-registered primary event")
+    ap.add_argument("--target-per-arm", type=int, default=TARGET_PER_ARM,
+                    help="stopping rule: visitors in the smaller arm (pre-registered: 250)")
+    ap.add_argument("--max-days", type=int, default=MAX_DAYS,
+                    help="stopping rule: days running (pre-registered: 28; the EC2 demo: 7)")
     ap.add_argument("--final", action="store_true",
                     help="require the final brief; refuses if the stopping rule isn't met")
     ap.add_argument("--out", type=Path, help="write Markdown here instead of stdout")
     args = ap.parse_args()
 
-    text = render(load(Path(args.db), args.experiment, args.conversion), args.experiment, args.final)
+    text = render(load(Path(args.db), args.experiment, args.conversion), args.experiment, args.final,
+                  args.target_per_arm, args.max_days)
     if args.out:
         args.out.write_text(text + "\n")
         print(f"wrote {args.out}")

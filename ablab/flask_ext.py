@@ -176,4 +176,6 @@ class Experiment:
         analysis/report.py when the experiment ends.
         """
         return jsonify(experiment=self.name,
-                       counts=store.counts(self.name, conversion=self.conversion))
+                       counts=store.counts(self.name, conversion=self.conversion),
+                       stopping_rule={"target_per_arm": self.target_per_arm,
+                                      "max_days": self.max_days})

@@ -276,3 +276,10 @@ What the POC demonstrates, and how:
   the cost of peeking.
 
 It makes no claim about which layout is better. That claim needs the full run.
+
+**The demo's own stopping rule (set 2026-10-03, before the demo was shared
+publicly):** 250 visitors per layout or **7 days** from the demo's first
+visitor, whichever comes first, via `AB_MAX_DAYS=7`. The live page and the
+final brief unseal on that rule. The demo's data mixes labelled synthetic
+traffic with real visitors, so its result illustrates the readout; it is not
+evidence about which layout is better.

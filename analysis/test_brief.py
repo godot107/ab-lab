@@ -72,3 +72,12 @@ def test_time_on_page_uses_the_median_and_reports_coverage(tmp_path):
     assert u["timed_share"] == 0.4                       # 4 of 10 visitors sent timing
     assert u["median_visible"] == 30.0                   # 4, 30, 30, 3000 -> not the mean
     assert u["quick_exit"] == 0.25                       # only the 4-second visitor
+
+
+def test_shorter_time_limit_unseals_the_final_brief(tmp_path):
+    db = tmp_path / "e.db"
+    make_db(db, 40, 0.2, 0.6)                    # far below 250 per arm, one day of data
+    d = brief.load(db, "exp")
+    with pytest.raises(SystemExit):
+        brief.render(d, "exp", want_final=True)                      # 28-day rule: sealed
+    assert "decision brief" in brief.render(d, "exp", True, max_days=0)  # demo rule met

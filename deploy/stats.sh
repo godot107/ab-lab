@@ -45,4 +45,9 @@ echo "    saved $dest" >&2
 
 py="$ROOT/.venv/bin/python"
 [ -x "$py" ] || py=python3
-"$py" "$ROOT/analysis/brief.py" --db "$dest" --experiment "$EXPERIMENT"
+# The live site's stopping rule, so this brief and /experiment agree.
+rule=$(curl -fsS "$(out SiteUrl)/api/stats" | "$py" -c \
+  'import json,sys; r=json.load(sys.stdin)["stopping_rule"]; print(r["target_per_arm"], r["max_days"])')
+read -r target days <<<"$rule"
+"$py" "$ROOT/analysis/brief.py" --db "$dest" --experiment "$EXPERIMENT" \
+  --target-per-arm "$target" --max-days "$days"
