@@ -174,8 +174,21 @@ def daily_columns(per_day: dict[str, Counter]) -> str:
 
 # --- the page ----------------------------------------------------------------------
 
+def preview(base_url: str) -> str:
+    """Link-preview tags; the image is the dashboard's, served by the host app."""
+    desc = ("Live, anonymous results of an A/B test on a job-market dashboard. "
+            "It won't name a winner until the test is done.")
+    tags = {"og:type": "website", "og:title": "Charts first or tiles first? Live A/B test",
+            "og:description": desc, "twitter:card": "summary_large_image"}
+    if base_url:
+        tags.update({"og:image": f"{base_url}/assets/og.png", "og:image:width": "1200",
+                     "og:image:height": "627"})
+    return ("".join(f'<meta property="{k}" content="{esc(v)}">' for k, v in tags.items())
+            + f'<meta name="description" content="{esc(desc)}">')
+
+
 def render(experiment: str, conversion: str, split: int = 50, target_per_arm: int = 250,
-           max_days: int = 28, path=None) -> str:
+           max_days: int = 28, path=None, base_url: str = "") -> str:
     s = load(experiment, conversion, path)
     vs = list(s.visitors.values())
     arms = {k: [v for v in vs if v.variant == k] for k in "AB"}
@@ -233,6 +246,7 @@ def render(experiment: str, conversion: str, split: int = 50, target_per_arm: in
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="60">
 <title>Experiment status</title>
+{preview(base_url)}
 <style>{CSS}</style></head>
 <body><main>
 <header>

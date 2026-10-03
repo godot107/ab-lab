@@ -170,3 +170,14 @@ def test_demo_stopping_rule_comes_from_the_environment(monkeypatch, sqlite_db, t
                    AB_MAX_DAYS="7")
     rule = app.server.test_client().get("/api/stats").get_json()["stopping_rule"]
     assert rule == {"target_per_arm": 250, "max_days": 7}
+
+
+def test_shared_links_get_preview_tags_with_the_public_address(live):
+    c = live.server.test_client()
+    hdrs = {**UA, "X-Forwarded-Proto": "https", "X-Forwarded-Host": "demo.example.com"}
+    page = c.get("/", headers=hdrs).get_data(as_text=True)
+    assert 'property="og:image" content="https://demo.example.com/assets/og.png"' in page
+    assert 'property="og:title"' in page and "anonymous cookie" in page
+    stats = c.get("/experiment", headers=hdrs).get_data(as_text=True)
+    assert 'content="https://demo.example.com/assets/og.png"' in stats
+    assert c.get("/assets/og.png").status_code == 200

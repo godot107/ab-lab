@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from flask import request
+from werkzeug.middleware.proxy_fix import ProxyFix
 from dash import (ALL, Dash, Input, Output, State, clientside_callback, ctx, dash_table, dcc,
                   html, no_update)
 
@@ -787,6 +788,34 @@ def render_drill(drill, variable, stop, window, theme):
 # Serving
 # ---------------------------------------------------------------------------
 server = app.server          # WSGI entry point: gunicorn hiringlab_app:server
+# Caddy is the only thing in front, so trust its X-Forwarded-Proto/Host: link-preview
+# tags need the public https:// address, which the repo must not hard-code.
+server.wsgi_app = ProxyFix(server.wsgi_app, x_proto=1, x_host=1)
+
+
+def preview_tags() -> str:
+    """Open Graph tags so a shared link shows a title, description and image."""
+    base = request.url_root.rstrip("/") if request else ""
+    desc = ("A job-market dashboard running a live A/B test. You'll see a random version; "
+            "one anonymous cookie, no personal data." if EXP else
+            "Where is US employer hiring demand growing, and how broad is it? "
+            "Built on Indeed Hiring Lab's public Job Postings Index.")
+    tags = {"og:type": "website", "og:title": "Hiring Demand Monitor", "og:description": desc,
+            "og:image": f"{base}/assets/og.png", "og:image:width": "1200", "og:image:height": "627",
+            "twitter:card": "summary_large_image"}
+    return "".join(f'<meta property="{k}" content="{html_lib.escape(v)}">' for k, v in tags.items()) + \
+        f'<meta name="description" content="{html_lib.escape(desc)}">'
+
+
+_interpolate_index = app.interpolate_index
+
+
+def interpolate_index(**kw):
+    kw["metas"] = kw.get("metas", "") + preview_tags()
+    return _interpolate_index(**kw)
+
+
+app.interpolate_index = interpolate_index
 
 
 @server.route("/healthz")

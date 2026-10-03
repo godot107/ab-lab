@@ -165,7 +165,8 @@ class Experiment:
         """Public status page: anonymous totals, blinded until the stopping rule.
         Viewing it logs nothing."""
         page = dashboard.render(self.name, self.conversion, self.split,
-                                self.target_per_arm, self.max_days)
+                                self.target_per_arm, self.max_days,
+                                base_url=request.url_root.rstrip("/"))
         return page, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
     def _stats(self):
