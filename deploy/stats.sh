@@ -2,7 +2,7 @@
 # Live status of the running POC, without stopping it.
 #
 #   deploy/stats.sh             # copy the live events.db to data/, print the status brief
-#   deploy/stats.sh --counts    # just visitors and drill-throughs per arm (/api/stats)
+#   deploy/stats.sh --counts    # just visitors and drill-throughs (/api/stats; pooled until the rule)
 #   AB_URL=https://ab.example.com deploy/stats.sh --counts   # same, no AWS login needed
 #
 # Safe to run as often as you like: until the stopping rule is met the brief is

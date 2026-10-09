@@ -175,7 +175,7 @@ on page, devices. Anonymous totals only, and blinded like the brief.
 **Check on it any time:** `deploy/stats.sh` copies the live db to
 `data/events-ab-lab-live.db` and prints the status brief (blinded: pooled usage,
 no A-vs-B numbers until the stopping rule is met). `deploy/stats.sh --counts`
-prints just the per-arm counts from `/api/stats`.
+prints just the counts from `/api/stats`, pooled until the stopping rule.
 
 **What `stats.sh` does, by hand** (consistent snapshot of the live db; the app
 keeps running):
@@ -202,7 +202,8 @@ sudo sqlite3 /var/lib/docker/volumes/ab-lab_data/_data/events.db \
 ```
 
 **Counts without any AWS access:** `curl <site>/api/stats` returns exposed and
-converted per arm, deliberately with no p-value.
+converted, pooled across arms until the stopping rule (per arm after), and
+deliberately with no p-value.
 
 **At teardown:** `down.sh` does the export for you before deleting anything.
 

@@ -22,8 +22,8 @@ running site.
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r monitor/requirements-dev.txt -r analysis/requirements.txt -e .
 source .venv/bin/activate
-python -m pytest -q ablab analysis                     # 9 + 6 tests
-cd monitor && python -m pytest -q                      # 41 tests
+python -m pytest -q ablab analysis                     # 11 + 8 tests
+cd monitor && python -m pytest -q                      # 43 tests
 python app/build_hiringlab.py --refresh                # data, first time only
 AB_EXPERIMENT=exp001_demo AB_SALT=localdemo COOKIE_SECURE=0 AB_DB_PATH=/tmp/m.db \
   python app/hiringlab_app.py                          # localhost:8050, experiment on
@@ -63,9 +63,14 @@ changes):
   Anonymous totals only (`ablab/dashboard.py`): pooled usage until the smaller
   arm reaches `target_per_arm` or `max_days` pass, per-arm rates after, never a
   p-value. Not linked from the dashboard, so the tested page doesn't change.
-- **`/api/stats` returns counts but never a p-value.** Peeking must not be one
-  click away; `analysis/simulate.py` shows 28 daily checks turn a 5% false
-  positive rate into 28%.
+- **`/api/stats` returns counts but never a p-value, pooled until the
+  stopping rule** (same rule as `/experiment`). Peeking must not be one click
+  away; `analysis/simulate.py` shows 28 daily checks turn a 5% false positive
+  rate into 28%. Per-arm counts are enough to compute the running result, which
+  is how exp001_demo leaked its split mid-test.
+- **The decision is read on real visitors only.** When synthetic and real
+  traffic are mixed, `report.py` and the final brief split them: real visitors
+  decide; synthetic ones are a method check against the planted effect.
 - **Underpowered by construction, and it says so.** At realistic traffic the
   MDE is ~12 pp. The real experiment will likely be inconclusive; the
   simulation harness is what demonstrates the method is sound anyway. Never

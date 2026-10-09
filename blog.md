@@ -204,7 +204,7 @@ two results:
 
 It also caught two flaws in my own tooling: the readout pooled synthetic and human traffic
 into one confident "adopt B", and the stats API leaked per-arm counts the status page was
-careful to hide. Both are listed with fixes. The real 28-day run hasn't happened. A LinkedIn
+careful to hide. Both are fixed now. The real 28-day run hasn't happened. A LinkedIn
 post brings dozens of visitors, not the 500 it needs.
 
 The full pre-registration, the sample stakeholder briefs and the code are in the

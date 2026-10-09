@@ -81,3 +81,19 @@ def test_shorter_time_limit_unseals_the_final_brief(tmp_path):
     with pytest.raises(SystemExit):
         brief.render(d, "exp", want_final=True)                      # 28-day rule: sealed
     assert "decision brief" in brief.render(d, "exp", True, max_days=0)  # demo rule met
+
+
+def test_mixed_traffic_decides_on_real_visitors_only(tmp_path):
+    """A planted synthetic effect must not become the headline for real users."""
+    db = tmp_path / "e.db"
+    make_db(db, 260, 0.30, 0.60, device="synthetic")       # a huge planted effect
+    ts = "2026-10-01T13:00:00+00:00"
+    for arm in "AB":
+        for i in range(10):                                # a few real visitors, no gap
+            store.record(ts, f"real-{arm}-{i}", "exp", arm, "exposure", device="mobile", path=db)
+            if i < 3:
+                store.record(ts, f"real-{arm}-{i}", "exp", arm, "drill_through", "rank", path=db)
+    text = brief.render(brief.load(db, "exp"), "exp", want_final=True)
+    assert "Part synthetic" in text and "uses only the 20 real visitors" in text
+    assert "Adopt layout B" not in text and "No change" in text
+    assert "## Method check" in text and "30.0% with A, 60.0% with B" in text

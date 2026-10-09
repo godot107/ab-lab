@@ -187,6 +187,15 @@ def preview(base_url: str) -> str:
             + f'<meta name="description" content="{esc(desc)}">')
 
 
+def rule_met(n_a: int, n_b: int, first: datetime | None, target_per_arm: int,
+             max_days: float) -> bool:
+    """The stopping rule: the smaller arm reaches its target, or the time limit
+    passes since the first exposure. Shared with /api/stats so the two unseal
+    together."""
+    days = (datetime.now(timezone.utc) - first).total_seconds() / 86400 if first else 0.0
+    return min(n_a, n_b) >= target_per_arm or days >= max_days
+
+
 def render(experiment: str, conversion: str, split: int = 50, target_per_arm: int = 250,
            max_days: int = 28, path=None, base_url: str = "") -> str:
     s = load(experiment, conversion, path)
@@ -195,7 +204,7 @@ def render(experiment: str, conversion: str, split: int = 50, target_per_arm: in
     n_a, n_b = len(arms["A"]), len(arms["B"])
     now = datetime.now(timezone.utc)
     days = (now - s.first).total_seconds() / 86400 if s.first else 0.0
-    rule_met = min(n_a, n_b) >= target_per_arm or days >= max_days
+    unsealed = rule_met(n_a, n_b, s.first, target_per_arm, max_days)
     pooled = usage(vs)
     p = srm_p(n_a, n_b, split)
     synthetic = sum(v.device == "synthetic" for v in vs)
@@ -217,7 +226,7 @@ def render(experiment: str, conversion: str, split: int = 50, target_per_arm: in
                for lo, hi, label in TIME_BUCKETS]
     devices = Counter(v.device for v in vs)
 
-    if rule_met:
+    if unsealed:
         ua, ub = usage(arms["A"]), usage(arms["B"])
         outcome = (
             '<section class="card"><h2>Result by version</h2>'

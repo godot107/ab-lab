@@ -54,7 +54,7 @@ python3 -m venv .venv && .venv/bin/pip install -r monitor/requirements-dev.txt -
 source .venv/bin/activate
 python -m pytest -q ablab/ analysis/                    # 9 ablab + 6 analysis tests
 
-cd monitor && python -m pytest -q                       # 41 tests
+cd monitor && python -m pytest -q                       # 43 tests
 python app/build_hiringlab.py --refresh                 # download the data, first time only
 AB_EXPERIMENT=exp001_demo AB_SALT=localdemo COOKIE_SECURE=0 AB_DB_PATH=/tmp/m.db \
   python app/hiringlab_app.py                           # http://localhost:8050, experiment on
@@ -118,7 +118,8 @@ checks   false positive rate
 
 Checking daily for a month and stopping at the first `p < 0.05` turns a 5% error
 rate into 28%. That is why the stopping rule is fixed in advance and why
-`/api/stats` reports counts but never a p-value.
+`/api/stats` reports counts but never a p-value, and pools the two layouts until
+the stopping rule is met.
 
 That harness has already earned its place: it caught a missing factor of 2 in
 the sample-size formula, which had every power calculation understating the
@@ -187,7 +188,7 @@ cloudburn scan infra --config .cloudburn.yml
 ## Layout
 
 ```
-monitor/      Hiring Demand Monitor — Dash dashboard, data-quality suite, SQL; the product under test, 41 tests
+monitor/      Hiring Demand Monitor — Dash dashboard, data-quality suite, SQL; the product under test, 43 tests
 ablab/        installable package — assignment, event store, Flask extension (collector, cookie, stats); mounts on any Flask or Dash app
 analysis/     stats.py (z-test, CI, SRM, power) · report.py · brief.py · simulate.py · synthetic_traffic.py
 infra/        CloudFormation: EC2 instance, launch template, SG, IAM role, S3 bucket, refresh timer

@@ -26,32 +26,54 @@ def main() -> int:
     args = ap.parse_args()
 
     from ablab import store
-    counts = store.counts(args.experiment, path=Path(args.db), conversion=args.conversion)
-    if set(counts) != {"A", "B"}:
-        print(f"Need both arms, got {sorted(counts)}. No traffic yet?")
+
+    def count(synthetic=None):
+        return store.counts(args.experiment, path=Path(args.db), conversion=args.conversion,
+                            synthetic=synthetic)
+
+    everyone, real, synth = count(), count(False), count(True)
+    if set(everyone) != {"A", "B"}:
+        print(f"Need both arms, got {sorted(everyone)}. No traffic yet?")
         return 1
 
-    a, b = counts["A"], counts["B"]
+    # Synthetic visitors carry a hand-set effect. Pooled with real ones, that
+    # effect becomes the headline, so when both are present the decision is
+    # read on real visitors only and the synthetic ones are a method check.
+    if real and synth:
+        strata = [("REAL VISITORS (the decision)", real),
+                  ("SYNTHETIC VISITORS (method check against the planted effect; "
+                   "excluded from the decision)", synth)]
+    elif synth:
+        strata = [("ALL VISITORS ARE SYNTHETIC (a demo of the method, not evidence "
+                   "about users)", synth)]
+    else:
+        strata = [("ALL VISITORS", real)]
+
     print(f"EXPERIMENT: {args.experiment}\n" + "=" * 60)
+    for label, c in strata:
+        srm = srm_check(c.get("A", {}).get("exposed", 0), c.get("B", {}).get("exposed", 0))
+        print(f"{label}\n  {srm}")
+        if srm.failed:
+            print("\nSTOP. Assignment or logging is broken. Do not read the metric "
+                  "below -- fix the pipeline and rerun the experiment.")
+            return 2
 
-    srm = srm_check(a["exposed"], b["exposed"])
-    print(srm)
-    if srm.failed:
-        print("\nSTOP. Assignment or logging is broken. Do not read the metric "
-              "below -- fix the pipeline and rerun the experiment.")
-        return 2
+    for label, c in strata:
+        print(f"\n{label}\nPRIMARY METRIC — {args.conversion} rate (visitors)\n" + "-" * 60)
+        if set(c) != {"A", "B"}:
+            print(f"Only arm {sorted(c)} has visitors here; nothing to compare.")
+            continue
+        a, b = c["A"], c["B"]
+        res = two_proportion_test(a["converted"], a["exposed"], b["converted"], b["exposed"])
+        print(res)
 
-    print(f"\nPRIMARY METRIC — {args.conversion} rate (visitors)\n" + "-" * 60)
-    res = two_proportion_test(a["converted"], a["exposed"], b["converted"], b["exposed"])
-    print(res)
-
-    smallest = mde(min(a["exposed"], b["exposed"]), res.p_a)
-    print(f"\nSmallest lift this sample could detect at 80% power: "
-          f"{smallest:.1%} absolute")
-    if not res.significant:
-        print("NOT SIGNIFICANT. Given the sample size, this means the effect was "
-              f"not measurable below {smallest:.1%} — it does NOT mean there is "
-              "no effect. Report it as inconclusive.")
+        smallest = mde(min(a["exposed"], b["exposed"]), res.p_a)
+        print(f"\nSmallest lift this sample could detect at 80% power: "
+              f"{smallest:.1%} absolute")
+        if not res.significant:
+            print("NOT SIGNIFICANT. Given the sample size, this means the effect was "
+                  f"not measurable below {smallest:.1%} — it does NOT mean there is "
+                  "no effect. Report it as inconclusive.")
     return 0
 
 

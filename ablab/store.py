@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
 
@@ -78,18 +79,32 @@ def record(ts, visitor_id, experiment, variant, event, target=None, device=None,
             return False  # duplicate exposure, by design
 
 
-def counts(experiment: str, path=None, conversion: str = "detail_click"
-           ) -> dict[str, dict[str, int]]:
+def first_exposure(experiment: str, path=None) -> datetime | None:
+    """When the experiment's first visitor was bucketed; None before any traffic."""
+    with connect(path) as conn:
+        ts = conn.execute("SELECT MIN(ts) FROM events WHERE experiment = ? AND event = 'exposure'",
+                          (experiment,)).fetchone()[0]
+    return datetime.fromisoformat(ts) if ts else None
+
+
+def counts(experiment: str, path=None, conversion: str = "detail_click",
+           synthetic: bool | None = None) -> dict[str, dict[str, int]]:
     """Per-arm exposed visitors and converters -- the two numbers the z-test needs.
-    `conversion` is the pre-registered primary event for this experiment."""
+    `conversion` is the pre-registered primary event for this experiment.
+    `synthetic` keeps only visitors whose exposure was (True) or wasn't (False)
+    synthetic demo traffic; None counts everyone."""
     with connect(path) as conn:
         rows = conn.execute(
             """
             SELECT variant,
                    COUNT(DISTINCT CASE WHEN event='exposure' THEN visitor_id END) AS exposed,
                    COUNT(DISTINCT CASE WHEN event=? THEN visitor_id END) AS converted
-            FROM events WHERE experiment = ? GROUP BY variant
+            FROM events WHERE experiment = ?
+              AND (? IS NULL OR (visitor_id IN (
+                    SELECT visitor_id FROM events WHERE experiment = ?
+                    AND event = 'exposure' AND device = 'synthetic')) = ?)
+            GROUP BY variant
             """,
-            (conversion, experiment),
+            (conversion, experiment, synthetic, experiment, synthetic),
         ).fetchall()
     return {r["variant"]: {"exposed": r["exposed"], "converted": r["converted"]} for r in rows}

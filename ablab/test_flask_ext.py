@@ -119,3 +119,28 @@ def test_dashboard_escapes_browser_reported_labels_and_logs_nothing(host):
     assert "<script>" not in r.get_data(as_text=True)
     assert "ab_vid" not in r.headers.get("Set-Cookie", "")
     assert sum(v["exposed"] for v in store.counts("exp_host").values()) == 2   # only the seeded ones
+
+
+def test_stats_api_is_pooled_until_the_stopping_rule(host):
+    """Per-arm counts are enough to compute the running result, so the API
+    seals them exactly when /experiment does."""
+    exp, c = host
+    _seed(5, drills=2)
+    body = c.get("/api/stats").get_json()
+    assert body["sealed"] and body["counts"] == {"pooled": {"exposed": 10, "converted": 4}}
+    exp.target_per_arm = 5
+    body = c.get("/api/stats").get_json()
+    assert not body["sealed"] and set(body["counts"]) == {"A", "B"}
+    assert "p_value" not in str(body).lower()
+
+
+def test_counts_can_split_synthetic_from_real(host):
+    ts = "2026-10-01T12:00:00+00:00"
+    for vid, device in (("r1", "desktop"), ("r2", "mobile"), ("s1", "synthetic")):
+        store.record(ts, vid, "exp_host", "A", "exposure", device=device)
+        store.record(ts, vid, "exp_host", "A", "drill_through", "rank")
+    assert store.counts("exp_host", conversion="drill_through")["A"]["exposed"] == 3
+    assert store.counts("exp_host", conversion="drill_through", synthetic=False)["A"] == \
+        {"exposed": 2, "converted": 2}
+    assert store.counts("exp_host", conversion="drill_through", synthetic=True)["A"] == \
+        {"exposed": 1, "converted": 1}

@@ -40,15 +40,17 @@ rule; see the amendment in `docs/experiment_design.md`.*
 - **`report.py` and `brief.py` pool synthetic and human traffic.** Their
   headline (+18.9 pp, p = 0.0045, and "Adopt layout B" in the brief) is
   dominated by the planted effect. The brief does print a "200 of 226 visitors
-  were synthetic" banner, but its bottom line still reads as a decision. Fix:
-  split the readout by `device = 'synthetic'`, and refuse a decision line when
-  any synthetic traffic is present.
+  were synthetic" banner, but its bottom line still reads as a decision.
+  **Fixed (2026-10-09):** with mixed traffic both tools now decide on real
+  visitors only and report the synthetic ones as a separate method check.
+  Rerun on this snapshot, the brief's bottom line reads "No change … *not*
+  evidence that the layouts are equivalent".
 - **`/api/stats` exposed per-arm counts during the test.** `/experiment`
   and the interim brief were blinded, but the API (by design, "counts, never
   a p-value") let anyone compute the running A-vs-B split. The counts were
   seen once, on 2026-10-09, shortly before the decision to stop early.
-  Fix: return pooled counts until the stopping rule is met, like the status
-  page.
+  **Fixed (2026-10-09):** `/api/stats` now returns pooled counts until the
+  stopping rule is met, using the same rule as the status page.
 
 ## Raw output
 
@@ -64,9 +66,9 @@ z=2.843  p=0.0045  [SIGNIFICANT at alpha=0.05]
 Smallest lift this sample could detect at 80% power: 18.9% absolute
 ```
 
-The generated stakeholder brief (`brief.py --final --max-days 4`) follows
-unedited. Read its bottom line in the light of finding 2: it describes the
-synthetic effect, not a recommendation.
+The stakeholder brief below (`brief.py --final --max-days 4`) is the version
+generated before the fix, kept unedited as a record of the flaw. Its bottom
+line describes the synthetic effect, not a recommendation.
 
 ---
 

@@ -170,13 +170,20 @@ class Experiment:
         return page, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
     def _stats(self):
-        """Live counts. Deliberately NOT a p-value.
+        """Live counts. Deliberately NOT a p-value, and pooled across arms until
+        the stopping rule, the same rule /experiment uses.
 
-        Exposing significance here would make peeking one click away, and the
-        pre-registration commits to a single analysis at a fixed horizon. Run
-        analysis/report.py when the experiment ends.
+        Per-arm counts are all anyone needs to compute the running A-vs-B
+        result, so serving them mid-test unblinds the test as surely as a
+        p-value would. Run analysis/report.py when the experiment ends.
         """
-        return jsonify(experiment=self.name,
-                       counts=store.counts(self.name, conversion=self.conversion),
+        counts = store.counts(self.name, conversion=self.conversion)
+        n = {k: counts.get(k, {}).get("exposed", 0) for k in "AB"}
+        sealed = not dashboard.rule_met(n["A"], n["B"], store.first_exposure(self.name),
+                                        self.target_per_arm, self.max_days)
+        if sealed:
+            counts = {"pooled": {k: sum(c[k] for c in counts.values())
+                                 for k in ("exposed", "converted")}}
+        return jsonify(experiment=self.name, sealed=sealed, counts=counts,
                        stopping_rule={"target_per_arm": self.target_per_arm,
                                       "max_days": self.max_days})
