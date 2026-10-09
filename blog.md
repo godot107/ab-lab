@@ -190,9 +190,22 @@ rule out a version that's slower or broken, and the readout says so.
 
 ## Where it stands
 
-The method, the pipeline and the deploy are done and tested, including a live demo on AWS. The real 28-day run hasn't happened. If it does, it will most
-likely come back inconclusive, and the write-up will say exactly that, with the size of effect
-it could have detected.
+The method, the pipeline and the deploy are done and tested. The live demo on AWS ran from
+October 3 to 9, 2026 and has been torn down. [Its readout](docs/exp001_demo_readout.md) is
+two results:
+
+- **Against known truth, the method works.** 200 synthetic visitors carried a planted +12-point
+  lift. The test called it (p = 0.006), and its 95% interval (+6 to +33 points) covered the
+  truth. The point estimate overshot to +19, which is what a significant result looks like
+  when the test only just has the power to detect the effect.
+- **On real visitors, it's inconclusive.** 26 people in six days, several of them me. The test
+  could only have detected a difference of about 50 points. That says nothing about whether
+  the layouts differ.
+
+It also caught two flaws in my own tooling: the readout pooled synthetic and human traffic
+into one confident "adopt B", and the stats API leaked per-arm counts the status page was
+careful to hide. Both are listed with fixes. The real 28-day run hasn't happened. A LinkedIn
+post brings dozens of visitors, not the 500 it needs.
 
 The full pre-registration, the sample stakeholder briefs and the code are in the
 [repository](https://github.com/godot107/ab-lab).

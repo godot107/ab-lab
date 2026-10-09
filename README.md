@@ -1,9 +1,10 @@
 # AB-Lab
 
-> **Draft — work in progress.** Built, tested, and run as a short EC2 demo
-> (mostly synthetic, labelled traffic). The pre-registered 28-day run hasn't
-> happened, so no real-traffic result exists and nothing here reports an
-> experiment outcome.
+> **Draft — work in progress.** Built, tested, and run as a six-day EC2 demo
+> (Oct 3–9, 2026, now torn down). [The demo's readout](docs/exp001_demo_readout.md)
+> checks the method against a planted effect (200 synthetic visitors) and
+> reports the real visitors (26) as inconclusive. The pre-registered 28-day
+> run hasn't happened, so nothing here claims which layout is better.
 
 An A/B test, run end to end, on a US job-postings dashboard built from
 [Indeed Hiring Lab](https://github.com/hiring-lab/job_postings_tracker)'s
@@ -138,7 +139,9 @@ stopping at the first lead -- which is how a 5% false-positive rate becomes
 appears in.
 
 See [`docs/sample_brief.md`](docs/sample_brief.md) for both stages, generated
-from synthetic traffic with a known effect.
+from synthetic traffic with a known effect, and
+[`docs/exp001_demo_readout.md`](docs/exp001_demo_readout.md) for the live
+demo's readout, including where the tooling overstated it.
 
 ## Privacy
 
@@ -189,5 +192,5 @@ ablab/        installable package — assignment, event store, Flask extension (
 analysis/     stats.py (z-test, CI, SRM, power) · report.py · brief.py · simulate.py · synthetic_traffic.py
 infra/        CloudFormation: EC2 instance, launch template, SG, IAM role, S3 bucket, refresh timer
 deploy/       up.sh · stats.sh · down.sh
-docs/         experiment_design.md · variants.md · sample_brief.md · telemetry_options.md · hosting.md
+docs/         experiment_design.md · variants.md · sample_brief.md · exp001_demo_readout.md · telemetry_options.md · hosting.md
 ```

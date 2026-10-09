@@ -283,3 +283,16 @@ visitor, whichever comes first, via `AB_MAX_DAYS=7`. The live page and the
 final brief unseal on that rule. The demo's data mixes labelled synthetic
 traffic with real visitors, so its result illustrates the readout; it is not
 evidence about which layout is better.
+
+## Appendix A: amendments
+
+**2026-10-09: demo stopped early.** `exp001_demo` was stopped at
+2026-10-09 14:35 UTC, about 28 hours before its 7-day rule (2026-10-10 18:09
+UTC). No visitor had arrived since 2026-10-07, so the remaining day was
+unlikely to change the data. The final brief was rendered with
+`--max-days 4`, the span of the data. Disclosure: the per-arm counts from
+`/api/stats` were seen once, shortly before the decision to stop. Because
+88% of the traffic was synthetic with a known effect, stopping early has no
+bearing on any claim about real users. The
+readout is in `docs/exp001_demo_readout.md`. This doesn't affect
+`exp001_layout`, which has not run.

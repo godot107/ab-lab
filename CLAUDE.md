@@ -104,7 +104,9 @@ changes):
   the pipeline and rerun, don't interpret.
 - Dashboard data is Indeed Hiring Lab's public Job Postings Index (CC BY 4.0).
   Keep the attribution and the "not affiliated with Indeed" line on the page.
-- `events.db` is real visitor data: git-ignored, and deleted after the write-up.
+- `events.db` is real visitor data (random UUIDs, no IPs): git-ignored, never
+  committed or uploaded. Exports from finished runs are archived off-repo at
+  `~/archive/ab-lab/` on the owner's workstation (owner's call, 2026-10-09).
 
 ## Hosting
 
